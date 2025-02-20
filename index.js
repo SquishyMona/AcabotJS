@@ -19,7 +19,7 @@ for (const folder of commandFolders) {
 	const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 	for (const file of commandFiles) {
 		const filePath = path.join(commandsPath, file);
-		const command = (await import(`file://${filePath}`));;
+		const command = await import(`file://${filePath}`);
 		if ('data' in command && 'execute' in command) {
 			client.commands.set(command.data.name, command);
 		} else {
@@ -33,7 +33,8 @@ const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'
 
 for (const file of eventFiles) {
 	const filePath = path.join(eventsPath, file);
-	const event = (await import(`file://${filePath}`));;
+	console.log(filePath);
+	const event = await import(`file://${filePath}`);
 	if (event.once) {
 		client.once(event.name, (...args) => event.execute(...args));
 	} else {
