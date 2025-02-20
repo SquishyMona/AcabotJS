@@ -1,5 +1,5 @@
 import { SlashCommandBuilder } from 'discord.js';
-import { linkGoogleAccount } from '../../lib/gcal/sample.js';
+import { linkGoogleAccount } from '../../lib/gcal/auth.js';
 
 const data = new SlashCommandBuilder()
 	.setName('linkaccount')
