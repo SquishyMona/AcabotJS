@@ -1,8 +1,9 @@
-const { REST, Routes } = require('discord.js');
-const fs = require('node:fs');
-const path = require('node:path');
-const dotenv = require('dotenv');
+import { REST, Routes } from 'discord.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import dotenv from 'dotenv';
 dotenv.config();
+const __dirname = path.resolve();
 
 const commands = [];
 // Grab all the command folders from the commands directory you created earlier
@@ -16,7 +17,7 @@ for (const folder of commandFolders) {
 	// Grab the SlashCommandBuilder#toJSON() output of each command's data for deployment
 	for (const file of commandFiles) {
 		const filePath = path.join(commandsPath, file);
-		const command = require(filePath);
+		const command = (await import(`file://${filePath}`));;
 		if ('data' in command && 'execute' in command) {
 			commands.push(command.data.toJSON());
 		} else {

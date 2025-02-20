@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "A Discord bot made for the A Capella groups of Fredonia, made with discord.js",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "deploy-and-run": "node deploy-commands.js; echo 'Commands deployed, starting bot...'; node index.js",
     "run": "node index.js"
