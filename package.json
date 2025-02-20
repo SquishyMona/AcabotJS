@@ -1,0 +1,22 @@
+{
+  "name": "acabotjs",
+  "version": "1.0.0",
+  "description": "A Discord bot made for the A Capella groups of Fredonia, made with discord.js",
+  "main": "index.js",
+  "scripts": {
+    "deploy-and-run": "node deploy-commands.js; echo 'Commands deployed, starting bot...'; node index.js",
+    "run": "node index.js"
+  },
+  "author": "Ian Cioppa",
+  "license": "ISC",
+  "dependencies": {
+    "@google-cloud/local-auth": "^2.1.0",
+    "discord.js": "^14.18.0",
+    "dotenv": "^16.4.7",
+    "googleapis": "^105.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.20.0",
+    "eslint": "^9.20.1"
+  }
+}
