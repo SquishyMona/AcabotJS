@@ -3,3 +3,6 @@ node_modules
 credentials.json
 token.json
 tokens
+synctokens.json
+serviceaccount.json
+links.json
