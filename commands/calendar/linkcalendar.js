@@ -33,13 +33,15 @@ export const execute = async (interaction) => {
 	if (!acl) return await interaction.followUp('There was an error sharing your calendar with the bot.');
 
 
-	const watch = await newWatch(interaction.member.id, calendar.id).catch(async (error) => {
+	const watch = await newWatch(interaction.member.id, calendar.id, interaction.guild.id).catch(async (error) => {
 		console.error(error);
 		return null;
 	});
 	if (!watch) return await interaction.followUp('There was an error setting up the watch on your calendar.');
 
-	links.push({ serverId: interaction.guild.id, calendarId: calendar.id, watch: watch });
+	const index = links.findIndex(link => link.serverId === interaction.guild.id);
+	if (index === -1) links.push({ serverId: interaction.guild.id, calendars: [{ calendarId: calendar.id, watch: watch }] });
+	else links[index].calendars.push({ calendarId: calendar.id, watch: watch });
 	await fs.writeFile(`${process.cwd()}/lib/gcal/links.json`, JSON.stringify(links, null, '\t'));
 	await interaction.followUp(`${calendar.summary} has been linked to this server!`);
 };

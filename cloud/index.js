@@ -11,6 +11,7 @@ functions.http('webhooks', async (req, res) => {
 		const calendar = google.calendar({ version: 'v3', auth });
 
 		const task = req.get('X-Goog-Resource-State');
+		console.log(`Task: ${task}`);
 
 		if (task === 'incremental-sync') {
 			const file = await fs.readFile(`${process.cwd()}/synctokens.json`, 'utf8');
@@ -23,21 +24,41 @@ functions.http('webhooks', async (req, res) => {
 				console.log(`Calendar ${syncToken.calendarId} synced: ${result.data.updatedMin}`);
 			});
 			res.send('Sucessfully synced calendars');
+			return;
 		}
 
+		const calendarId = req.get('X-Goog-Resource-URI').split('/')[6];
+		const channelToken = req.get('X-Goog-Channel-Token');
+		const guildId = channelToken.split('=')[1];
+
 		if (task === 'sync') {
-			const calendarId = req.get('X-Goog-Calendar-Id');
-			const syncToken = req.get('X-Goog-Sync-Token');
+			const resourceId = req.get('X-Goog-Resource-ID');
+			const channelId = req.get('X-Goog-Channel-ID');
 			const file = await fs.readFile(`${process.cwd()}/synctokens.json`, 'utf8');
 			const syncTokens = JSON.parse(file);
-			const index = syncTokens.findIndex((newSyncToken) => newSyncToken.calendarId === calendarId);
-			if (index === -1) {
-				syncTokens.push({ calendarId, syncToken });
+			const list = await calendar.events.list({
+				calendarId,
+			});
+			const newSyncToken = list.data.nextSyncToken;
+			const channels = syncTokens.findIndex((item) => item.guildId === guildId);
+			if (channels === -1) {
+				syncTokens.push({ guildId, channels: [{resourceId, channelId, newSyncToken}] });
 			} else {
-				syncTokens[index].syncToken = syncToken;
+				const index = syncTokens[index].channels.findIndex((item) => item.resourceId === resourceId);
+				if (index === -1) {
+					syncTokens[channels].channels.push({resourceId, channelId, newSyncToken});
+				} else {
+					calendar.channels.stop({
+						calendarId,
+						id: syncTokens[channels].channels[index].channelId,
+					});
+					syncTokens[channels].channels.splice(index, 1, { resourceId, channelId, newSyncToken });
+				}			
 			}
 			await fs.writeFile(`${process.cwd()}/synctokens.json`, JSON.stringify(syncTokens));
+			console.log(`Calendar ${calendarId} watched.`);
 			res.send('Sucessfully watched calendar');
+			return;
 		}
 
 		const results = await calendar.events.list({
@@ -59,7 +80,6 @@ functions.http('webhooks', async (req, res) => {
 	} catch (error) {
 		console.error('Error loading service account:', error);
 	}
-
 
 	res.send('Sucessfully received webhook');
 });
