@@ -24,29 +24,25 @@ functions.http('webhooks', async (req, res) => {
 			syncTokens.forEach(async (syncToken) => {
 				const data = syncToken.data();
 				const newChannels = [];
-				const sync = new Promise((resolve, reject) => {
-					try {
-						data.channels.forEach(async (channel) => {
-							console.log(`Channel: ${JSON.stringify(channel)}`);
-							const result = await calendar.events.list({
-								calendarId: channel.calendarId,
-								syncToken: channel.syncToken,
-							});
-							newChannels.push({
-								calendarId: channel.calendarId,
-								channelId: channel.channelId,
-								resourceId: channel.resourceId,
-								syncToken: result.data.nextSyncToken,
-							});
-							console.log(`Calendar ${channel.calendarId} in Guild ${data.guildId} synced`);
+				try {
+					for await (const channel of data.channels) {
+						console.log(`Channel: ${JSON.stringify(channel)}`);
+						const result = await calendar.events.list({
+							calendarId: channel.calendarId,
+							syncToken: channel.syncToken,
 						});
-						resolve();
-					} catch (error) {
-						console.error('Error syncing calendars:', error);
-						reject(error);
-					}
-				});
-				await sync();
+						newChannels.push({
+							calendarId: channel.calendarId,
+							channelId: channel.channelId,
+							resourceId: channel.resourceId,
+							syncToken: result.data.nextSyncToken,
+						});
+						console.log(`Calendar ${channel.calendarId} in Guild ${data.guildId} synced`);
+					};
+				} catch (error) {
+					console.error('Error syncing calendars:', error);
+					reject(error);
+				}
 				console.log(`Channels after forEach: ${JSON.stringify(newChannels)}`);
 				await syncToken.ref.set({ guildId: data.guildId, channels: newChannels });
 			});
@@ -58,7 +54,9 @@ functions.http('webhooks', async (req, res) => {
 		const calendarId = calendarIdURI.replace('%40', '@');
 		console.log(`Calendar ID: ${calendarId}`);
 		const channelToken = req.get('X-Goog-Channel-Token');
-		const guildId = channelToken.split('=')[1];
+		const tokenParams = channelToken.split('&');
+		const guildId = tokenParams[0].split('=')[1];
+		const webhookUrl = tokenParams[1].split('=')[1];
 
 		if (task === 'sync') {
 			const resourceId = req.get('X-Goog-Resource-ID');
@@ -101,20 +99,24 @@ functions.http('webhooks', async (req, res) => {
 			return;
 		}
 
-		const results = await calendar.events.list({
-			calendarId: 'c_02be5751f95d78aafc27982ed6d0eb5f78a64cd69413161ead861c9a85015440@group.calendar.google.com',
-			timeMin: new Date().toISOString(),
-			maxResults: 10,
-			singleEvents: true,
-			orderBy: 'startTime',
-		});
-		console.log(`Results: ${JSON.stringify(results)}`);
-		const events = results.data.items;
-		if (!events || events.length === 0) {
-			console.log('No upcoming events found.');
-			res.send('No upcoming events found.');
-		}
-		console.log(events);
+		if (task === 'exists') {
+			const doc = await db.collection('synctokens').doc(guildId).get();
+			let syncToken = '';
+			let webhookUrl = '';
+			for await (const channel of doc.data().channels) {
+				if (channel.calendarId === calendarId) {
+					syncToken = channel.syncToken;
+					webhookUrl = doc.data().webhookUrl
+					break;
+				}
+			};
+			const results = calendar.events.list({
+				calendarId,
+				syncToken
+			});
+			await sendWebhook(webhookUrl, results);
+		}	
+		
 		res.send(results);
 		return;
 	} catch (error) {
@@ -123,3 +125,7 @@ functions.http('webhooks', async (req, res) => {
 
 	res.send('Sucessfully received webhook');
 });
+
+const sendWebhook = async (url, data) => {
+	
+};

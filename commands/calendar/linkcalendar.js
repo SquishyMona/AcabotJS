@@ -10,6 +10,10 @@ export const data = new SlashCommandBuilder()
 	.addStringOption(option =>
 		option.setName('calendar_id')
 			.setDescription('The ID of the calendar you want to link')
+			.setRequired(true))
+	.addChannelOption(option =>
+		option.setName('channel')
+			.setDescription('The channel to send calendar events to')
 			.setRequired(true));
 
 export const execute = async (interaction) => {
@@ -32,8 +36,11 @@ export const execute = async (interaction) => {
 	});
 	if (!acl) return await interaction.followUp('There was an error sharing your calendar with the bot.');
 
-
-	const watch = await newWatch(interaction.member.id, calendar.id, interaction.guild.id).catch(async (error) => {
+	const webhooks = await interaction.guild.fetchWebhooks();
+	const webhookUrl = webhooks.find(webhook => webhook.owner.id === interaction.client.user.id).url;
+	const textChannel = interaction.options.getChannel('channel');
+	if (!webhookUrl) await textChannel.createWebhook({ name: 'Acabot' }).then(webhook => webhookUrl = webhook.url);
+	const watch = await newWatch(interaction.member.id, calendar.id, interaction.guild.id.webhookUrl).catch(async (error) => {
 		console.error(error);
 		return null;
 	});
