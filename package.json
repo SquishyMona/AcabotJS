@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "deploy-and-run": "node deploy-commands.js; echo 'Commands deployed, starting bot...'; node index.js",
-    "run": "node index.js"
+    "start": "node index.js"
   },
   "author": "Ian Cioppa",
   "license": "ISC",
