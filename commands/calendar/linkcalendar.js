@@ -21,7 +21,7 @@ export const execute = async (interaction) => {
 	const calendarId = interaction.options.getString('calendar_id');
 	const linkFile = await fs.readFile(`${process.cwd()}/lib/gcal/links.json`, 'utf8');
 	const links = await JSON.parse(linkFile);
-	if (links.some(link => link.serverId === interaction.guild.id && link.calendarId === calendarId)) return await interaction.followUp('This server is already linked to this calendar.');
+	if (links.some(link => link.serverId === interaction.guild.id && link.calendars.some(cal => cal.calendarId === calendarId))) return await interaction.followUp('This server is already linked to this calendar.');
 
 	const calendar = await getCalendar(interaction.member.id, calendarId).catch(async (error) => {
 		console.error(error);
@@ -36,11 +36,9 @@ export const execute = async (interaction) => {
 	});
 	if (!acl) return await interaction.followUp('There was an error sharing your calendar with the bot.');
 
-	const webhooks = await interaction.guild.fetchWebhooks();
-	const webhookUrl = webhooks.find(webhook => webhook.owner.id === interaction.client.user.id).url;
 	const textChannel = interaction.options.getChannel('channel');
-	if (!webhookUrl) await textChannel.createWebhook({ name: 'Acabot' }).then(webhook => webhookUrl = webhook.url);
-	const watch = await newWatch(interaction.member.id, calendar.id, interaction.guild.id.webhookUrl).catch(async (error) => {
+	const webhook = await textChannel.createWebhook({ name: 'Acabot' });
+	const watch = await newWatch(interaction.member.id, calendar.id, interaction.guild.id, webhook.url).catch(async (error) => {
 		console.error(error);
 		return null;
 	});
