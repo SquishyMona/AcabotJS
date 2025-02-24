@@ -37,7 +37,8 @@ export const execute = async (interaction) => {
 	if (!acl) return await interaction.followUp('There was an error sharing your calendar with the bot.');
 
 	const textChannel = interaction.options.getChannel('channel');
-	const webhook = await textChannel.createWebhook({ name: 'Acabot' });
+	const webhook = await textChannel.createWebhook({ name: 'Acabot', avatar: interaction.client.user.avatarURL() });
+	console.log(`New webhook created in #${textChannel.name}: ${webhook}`);
 	const watch = await newWatch(interaction.member.id, calendar.id, interaction.guild.id, webhook.url).catch(async (error) => {
 		console.error(error);
 		return null;
