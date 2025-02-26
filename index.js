@@ -9,6 +9,7 @@ const __dirname = path.resolve();
 // Create a new client instance
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
+
 client.commands = new Collection();
 
 const foldersPath = path.join(__dirname, 'commands');
@@ -44,3 +45,4 @@ for (const file of eventFiles) {
 
 
 client.login(BOT_TOKEN);
+export const botUserID = client.user.id;

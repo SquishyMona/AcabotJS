@@ -70,6 +70,7 @@ functions.http('webhooks', async (req, res) => {
 			return;
 		}
 
+
 		if (task === 'exists') {
 			const channelId = req.get('X-Goog-Channel-ID');
 			console.log(`Watch Channel ID: ${channelId}`);
@@ -89,7 +90,7 @@ functions.http('webhooks', async (req, res) => {
 				syncToken,
 			});
 			console.log(`Calendar list results: ${JSON.stringify(results)}`);
-			await sendWebhook(eventWebhookUrl, results.data.items, results.data.summary, calendarId, calendar);
+			await sendWebhook(eventWebhookUrl, results.data, calendarId, calendar, db, guildId);
 			await saveNextSyncToken(guildId, calendarId, results.data.nextSyncToken, doc, db);
 			res.send('Successfully sent webhook notification.');
 			return;
@@ -101,14 +102,19 @@ functions.http('webhooks', async (req, res) => {
 	res.send('Sucessfully received webhook');
 });
 
-const sendWebhook = async (url, data, calendarName, calendarId, calendar) => {
+const sendWebhook = async (url, results, calendarId, calendar, db, guildId) => {
+	const data = results.items;
+	const calendarName = results.summary;
 	console.log(`Webhook data: ${JSON.stringify(data)}`);
 	for await (let item of data) {
 		if (item.status === 'cancelled') {
-			item = await calendar.events.get({ calendarId, eventId: item.id });
+			const newResult = await calendar.events.get({ calendarId, eventId: item.id });
+			item = newResult.data;
+			console.log(`Cancelled event: ${JSON.stringify(item)}`);
 		}
-		const startDateObject = new Date(item.start.date ?? item.start.dateTime);
-		const endDateObject = new Date(item.end.date ?? item.end.dateTime);
+		console.log(`Start date: ${item.start.date}`);
+		const startDateObject = new Date(item.start.date ? item.start.date : item.start.dateTime);
+		const endDateObject = new Date(item.start.date ? item.end.date : item.end.dateTime);
 		const startDate = startDateObject.getTime() / 1000;
 		const endDate = endDateObject.getTime() / 1000;
 		const event = {
@@ -159,19 +165,23 @@ const sendWebhook = async (url, data, calendarName, calendarId, calendar) => {
 			'value': `[View in Google Calendar](${item.htmlLink})`,
 		});
 
+		let changeType = ''
 		if (item.status != 'cancelled') {
 			const created = new Date(item.created).getTime();
 			const updated = new Date(item.updated).getTime();
 			if (updated - created > 3000) {
 				event.content = `**An event on the "${calendarName}" calendar has been updated!**`;
 				event.embeds[0].color = 12436261;
+				changeType = 'updated';
 			} else {
 				event.content = `**A new event has been added to the "${calendarName}" calendar!**`;
 				event.embeds[0].color = 3066993;
+				changeType = 'added';
 			}
 		} else {
-			event.content = `An event on the ${calendarName} calendar has been deleted!`;
+			event.content = `**An event on the ${calendarName} calendar has been deleted!**`;
 			event.embeds[0].color = 15158332;
+			changeType = 'deleted';
 		}
 
 		const response = await fetch(url, {
@@ -184,9 +194,9 @@ const sendWebhook = async (url, data, calendarName, calendarId, calendar) => {
 
 		if (!response.ok) {
 			console.error(`Error sending webhook: ${response.statusText}`);
-			return;
 		}
 		console.log('Webhook sent:', response.statusText);
+		await sendScheduledEvent(item, changeType, db, guildId);
 	}
 };
 
@@ -230,3 +240,44 @@ const incrementalSync = async (db) => {
 		await syncToken.ref.set({ guildId: data.guildId, webhookUrl: data.webhookUrl, channels: newChannels });
 	});
 };
+
+const sendScheduledEvent = async (calendarEvent, status, db, guildId) => {
+	const requestPayload = {
+		method: status === 'added' ? 'POST' : status === 'updated' ? 'PATCH' : 'DELETE',
+		headers: {
+			'Content-Type': 'application/json',
+			'Authorization': `Bot ${process.env.DISCORD_BOT_KEY}`,
+		},
+		body: ''
+	};
+
+	if (status === 'added') {
+		requestPayload.body = JSON.stringify({
+			name: calendarEvent.summary,
+			entity_metadata: { location: calendarEvent.location },
+			scheduled_start_time: calendarEvent.start.date ? calendarEvent.start.date : calendarEvent.start.dateTime,
+			scheduled_end_time: calendarEvent.end.date ? calendarEvent.end.date : calendarEvent.end.dateTime,
+			privacy_leve: 2,
+			entity_type: 3,
+			description: calendarEvent.description,
+		});
+
+		const guild = await db.collection('discordevents').doc(guildId).get();
+
+		const response = await fetch(`https://discord.com/api/v10/guilds/${guildId}/scheduled-events`, requestPayload);
+		if (!response.ok) {
+			console.error(`Error sending scheduled event: ${response.statusText}`);
+		}
+		console.log('Scheduled event sent, storing data in Firestore.');
+		
+		if (guild.exists) {
+			const data = guild.data();
+			data.events.push({ googleId: calendarEvent.id, discordId: response.id, needsUpdate: true });
+			await db.collection('discordevents').doc(guildId).set(data);
+		} else {
+			await db.collection('discordevents').doc(guildId).set({ events: [{ googleId: calendarEvent.id, discordId: response.id, needsUpdate: true }] });
+		}
+
+		console.log('Scheduled event stored in Firestore.');
+	}
+}
