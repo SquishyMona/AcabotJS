@@ -114,7 +114,6 @@ const sendWebhook = async (url, results, calendarId, calendar, db, guildId) => {
 			item = newResult.data;
 			console.log(`Cancelled event: ${JSON.stringify(item)}`);
 		}
-		console.log(`Start date: ${item.start.date}`);
 		const startDateObject = new Date(item.start.date ? item.start.date : item.start.dateTime);
 		const endDateObject = new Date(item.start.date ? item.end.date : item.end.dateTime);
 		const startDate = startDateObject.getTime() / 1000;
@@ -197,7 +196,7 @@ const sendWebhook = async (url, results, calendarId, calendar, db, guildId) => {
 		if (!response.ok) {
 			console.error(`Error sending webhook: ${response.statusText}`);
 		}
-		console.log('Webhook sent:', response.statusText);
+		console.log('Webhook sent');
 		await sendScheduledEvent(item, changeType, db, guildId);
 	}
 };
@@ -207,6 +206,7 @@ const saveNextSyncToken = async (guildId, calendarId, syncToken, doc, db) => {
 	const index = channels.findIndex((item) => item.calendarId === calendarId);
 	channels[index].syncToken = syncToken;
 	await db.collection('synctokens').doc(guildId).set({ guildId, webhookUrl: doc.data().webhookUrl, channels });
+	console.log('Next sync token saved');
 };
 
 const incrementalSync = async (db) => {
@@ -293,30 +293,43 @@ const sendScheduledEvent = async (calendarEvent, status, db, guildId) => {
 	} else {
 		console.log('Event already exists, updating Discord.');
 		const guild = await db.collection('discordevents').doc(guildId).get();
-		const data = guild.data();
-		const event = data.events.indexOf((item) => item.googleId === calendarEvent.id);
+		const data = await guild.data();
+		console.log(`Firestore Data: ${JSON.stringify(data.events)}`);
+		const event = data.events.indexOf(data.events.find((item) => item.googleId === calendarEvent.id));
 		if (event === -1) {
-		if(status === 'deleted' && event === -1) {
-			console.log('Deleted event not found in Firestore, skipping.');
-			return;
-		}
-		if (data.events[event].needsUpdate) {
-			console.log('Event needs to be updated, sending to Discord.');
-			data.events[item].needsUpdate = false;
+			if(status === 'deleted') {
+				console.log('Deleted event not found in Firestore, skipping.');
+				return;
+			} else {
+				console.log('Event not found in Firestore, adding to Firestore.');
+				const response = await fetch(`https://discord.com/api/v10/guilds/${guildId}/scheduled-events/${data.events[event].discordId}`, requestPayload);
+				const resData = await response.json();		
+				data.events.push({ googleId: calendarEvent.id, discordId: resData.id, needsUpdate: true });
+				await db.collection('discordevents').doc(guildId).set(data);
+				console.log('Event added to Firestore.');
+				return;
+			}
+		} else {
+			if (!data.events[event].needsUpdate) {
+				console.log('Event already updated, switching update status.');
+				data.events[event].needsUpdate = true;
+				await db.collection('discordevents').doc(guildId).set(data);
+				console.log('Update status switched. Skipping Discord event update.');
+				return
+			}
+			data.events[event].needsUpdate = false;
 			if (status === 'deleted') {
 				data.events.splice(event, 1);
 			}
-			await db.collection('discordevents').doc(guildId).set(data);
-			const response = await fetch(`https://discord.com/api/v10/guilds/${guildId}/scheduled-events/${data.events[event].discordId}`, requestPayload);
-			const resData = await response.json();
-			console.log(`Response: ${JSON.stringify(resData)}`);
-			if (!response.ok) {
-				console.error(`Error updating scheduled event: ${JSON.stringify(resData)}`);
-				return;
-			}
-			console.log('Scheduled event updated.');
-		} else {
-			console.log('Event does not need to be updated.');
 		}
+		await db.collection('discordevents').doc(guildId).set(data);
+		const response = await fetch(`https://discord.com/api/v10/guilds/${guildId}/scheduled-events/${data.events[event].discordId}`, requestPayload);
+		const resData = await response.json();
+		console.log(`Response: ${JSON.stringify(resData)}`);
+		if (!response.ok) {
+			console.error(`Error updating scheduled event: ${JSON.stringify(resData)}`);
+			return;
+		}
+		console.log('Scheduled event updated.');
 	}
-}};
+};
