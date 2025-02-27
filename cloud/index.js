@@ -66,6 +66,8 @@ functions.http('webhooks', async (req, res) => {
 			console.log('Updating Firestore with new data.');
 			await db.collection('synctokens').doc(guildId).set(channels);
 			console.log(`Calendar ${calendarId} watched.`);
+			console.log('Creating new discordevents document for guild.');
+			await db.collection('discordevents').doc(guildId).set({ events: [] });
 			res.send('Sucessfully watched calendar');
 			return;
 		}
@@ -242,6 +244,7 @@ const incrementalSync = async (db) => {
 };
 
 const sendScheduledEvent = async (calendarEvent, status, db, guildId) => {
+	console.log(`Calendar Event: ${JSON.stringify(calendarEvent)}`);
 	const requestPayload = {
 		method: status === 'added' ? 'POST' : status === 'updated' ? 'PATCH' : 'DELETE',
 		headers: {
@@ -251,33 +254,69 @@ const sendScheduledEvent = async (calendarEvent, status, db, guildId) => {
 		body: ''
 	};
 
+	const start = new Date(calendarEvent.start.date ? calendarEvent.start.date : calendarEvent.start.dateTime).toISOString();
+	const end = new Date(calendarEvent.end.date ? calendarEvent.end.date : calendarEvent.end.dateTime).toISOString();
+	const entity_metadata = { location: calendarEvent.location ?? 'No Location Provided' };
+	requestPayload.body = JSON.stringify({
+		name: calendarEvent.summary,
+		entity_metadata: entity_metadata,
+		scheduled_start_time: start.replace('Z', '+05:00'),
+		scheduled_end_time: end.replace('Z', '+05:00'),
+		privacy_level: 2,
+		entity_type: 3,
+		description: calendarEvent.description,
+	});
+	console.log(`Request Payload: ${JSON.stringify(requestPayload)}`);
+
+
 	if (status === 'added') {
-		requestPayload.body = JSON.stringify({
-			name: calendarEvent.summary,
-			entity_metadata: { location: calendarEvent.location },
-			scheduled_start_time: calendarEvent.start.date ? calendarEvent.start.date : calendarEvent.start.dateTime,
-			scheduled_end_time: calendarEvent.end.date ? calendarEvent.end.date : calendarEvent.end.dateTime,
-			privacy_leve: 2,
-			entity_type: 3,
-			description: calendarEvent.description,
-		});
-
-		const guild = await db.collection('discordevents').doc(guildId).get();
-
+		console.log('Brand new event, sending to Discord.');
 		const response = await fetch(`https://discord.com/api/v10/guilds/${guildId}/scheduled-events`, requestPayload);
+		const resData = await response.json();
+		console.log(`Response: ${JSON.stringify(resData)}`);
 		if (!response.ok) {
-			console.error(`Error sending scheduled event: ${response.statusText}`);
+			console.error(`Error sending scheduled event: ${JSON.stringify(resData)}`);
+			return;
 		}
 		console.log('Scheduled event sent, storing data in Firestore.');
+
+		const guild = await db.collection('discordevents').doc(guildId).get();
 		
 		if (guild.exists) {
 			const data = guild.data();
-			data.events.push({ googleId: calendarEvent.id, discordId: response.id, needsUpdate: true });
+			data.events.push({ googleId: calendarEvent.id, discordId: resData.id, needsUpdate: true });
 			await db.collection('discordevents').doc(guildId).set(data);
 		} else {
-			await db.collection('discordevents').doc(guildId).set({ events: [{ googleId: calendarEvent.id, discordId: response.id, needsUpdate: true }] });
+			await db.collection('discordevents').doc(guildId).set({ events: [{ googleId: calendarEvent.id, discordId: resData.id, needsUpdate: true }] });
 		}
-
 		console.log('Scheduled event stored in Firestore.');
+	} else {
+		console.log('Event already exists, updating Discord.');
+		const guild = await db.collection('discordevents').doc(guildId).get();
+		const data = guild.data();
+		const event = data.events.indexOf((item) => item.googleId === calendarEvent.id);
+		if (event === -1) {
+		if(status === 'deleted' && event === -1) {
+			console.log('Deleted event not found in Firestore, skipping.');
+			return;
+		}
+		if (data.events[event].needsUpdate) {
+			console.log('Event needs to be updated, sending to Discord.');
+			data.events[item].needsUpdate = false;
+			if (status === 'deleted') {
+				data.events.splice(event, 1);
+			}
+			await db.collection('discordevents').doc(guildId).set(data);
+			const response = await fetch(`https://discord.com/api/v10/guilds/${guildId}/scheduled-events/${data.events[event].discordId}`, requestPayload);
+			const resData = await response.json();
+			console.log(`Response: ${JSON.stringify(resData)}`);
+			if (!response.ok) {
+				console.error(`Error updating scheduled event: ${JSON.stringify(resData)}`);
+				return;
+			}
+			console.log('Scheduled event updated.');
+		} else {
+			console.log('Event does not need to be updated.');
+		}
 	}
-}
+}};
