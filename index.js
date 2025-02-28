@@ -7,7 +7,7 @@ const BOT_TOKEN = String(process.env.BOT_TOKEN);
 const __dirname = path.resolve();
 
 const startBot = async () => {
-	const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+	const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildScheduledEvents] });
 
 
 	client.commands = new Collection();
@@ -34,7 +34,6 @@ const startBot = async () => {
 
 	for (const file of eventFiles) {
 		const filePath = path.join(eventsPath, file);
-		console.log(filePath);
 		const event = await import(`file://${filePath}`);
 		if (event.once) {
 			client.once(event.name, (...args) => event.execute(...args));
@@ -43,6 +42,7 @@ const startBot = async () => {
 		}
 	}
 
+	console.log(client.eventNames())
 
 	await client.login(BOT_TOKEN);
 	return client.user.id;

@@ -12,7 +12,8 @@ functions.http('webhooks', async (req, res) => {
 		const calendar = google.calendar({ version: 'v3', auth });
 
 		const task = req.get('X-Goog-Resource-State');
-		console.log(`Task recieved: ${task}`);
+		const channel = req.get('X-Goog-Channel-ID');
+		console.log(`Task recieved from watch channel ${channel}: ${task}`);
 
 		if (task === 'incremental-sync') {
 			await incrementalSync(db);
@@ -35,23 +36,41 @@ functions.http('webhooks', async (req, res) => {
 			console.log('Getting sync token collection from Firestore.');
 			const syncTokensSnapshot = await db.collection('synctokens').get();
 			const syncTokens = syncTokensSnapshot.docs.map(doc => doc.data());
-			console.log('Recieving a new token.');
-			const list = await calendar.events.list({
+			console.log('Listing events and recieving a new token.');
+			let list = await calendar.events.list({
 				calendarId,
 			});
-			const newSyncToken = list.data.nextSyncToken;
+
+			let morePages = false;
+
+			if (list.data.nextPageToken) {
+				morePages = true;
+			}
+
+			let newSyncToken = list.data.nextSyncToken;
+
+			while (morePages) {
+				console.log('Getting next page of events.');
+				const nextPage = await calendar.events.list({
+					calendarId,
+					pageToken: list.data.nextPageToken,
+				});
+				nextPage.data.nextPageToken ? morePages = true : morePages = false;
+				newSyncToken = nextPage.data.nextSyncToken;
+			}
 			console.log(`Checking if Guild ${guildId} already exists.`);
 			let channels = syncTokens.find((item) => item.guildId === guildId);
 			if (!channels) {
 				console.log('Guild not found, creating new entry.');
 				channels = { guildId, webhookUrl, channels: [{ calendarId, resourceId, channelId, syncToken: newSyncToken }] };
 				syncTokens.push(channels);
+				
 			} else {
 				console.log(`Guild found, checking if a watch entry exists for resourceId ${resourceId}.`);
 				const index = channels.channels.findIndex((item) => item.resourceId === resourceId);
 				if (index === -1) {
 					console.log('No watch entry found, creating new entry.');
-					channels.channels.push({ calendarId, resourceId, channelId, newSyncToken });
+					channels.channels.push({ calendarId, resourceId, channelId, syncToken: newSyncToken });
 				} else {
 					console.log('Watch entry found, stopping current watch and updating entry.');
 					calendar.channels.stop({
@@ -197,7 +216,7 @@ const sendWebhook = async (url, results, calendarId, calendar, db, guildId) => {
 			console.error(`Error sending webhook: ${response.statusText}`);
 		}
 		console.log('Webhook sent');
-		await sendScheduledEvent(item, changeType, db, guildId);
+		await sendScheduledEvent(item, calendarId, changeType, db, guildId);
 	}
 };
 
@@ -243,7 +262,7 @@ const incrementalSync = async (db) => {
 	});
 };
 
-const sendScheduledEvent = async (calendarEvent, status, db, guildId) => {
+const sendScheduledEvent = async (calendarEvent, calendarId, status, db, guildId) => {
 	console.log(`Calendar Event: ${JSON.stringify(calendarEvent)}`);
 	const requestPayload = {
 		method: status === 'added' ? 'POST' : status === 'updated' ? 'PATCH' : 'DELETE',
@@ -254,14 +273,14 @@ const sendScheduledEvent = async (calendarEvent, status, db, guildId) => {
 		body: ''
 	};
 
-	const start = new Date(calendarEvent.start.date ? calendarEvent.start.date : calendarEvent.start.dateTime).toISOString();
-	const end = new Date(calendarEvent.end.date ? calendarEvent.end.date : calendarEvent.end.dateTime).toISOString();
+	const start = new Date(calendarEvent.start.date ? calendarEvent.start.date : calendarEvent.start.dateTime.slice(0, -6) + 'Z').toISOString();
+	const end = new Date(calendarEvent.end.date ? calendarEvent.end.date : calendarEvent.end.dateTime.slice(0, -6) + 'Z').toISOString();
 	const entity_metadata = { location: calendarEvent.location ?? 'No Location Provided' };
 	requestPayload.body = JSON.stringify({
 		name: calendarEvent.summary,
 		entity_metadata: entity_metadata,
-		scheduled_start_time: start.replace('Z', '+05:00'),
-		scheduled_end_time: end.replace('Z', '+05:00'),
+		scheduled_start_time: start.replace('Z', '-05:00'),
+		scheduled_end_time: end.replace('Z', '-05:00'),
 		privacy_level: 2,
 		entity_type: 3,
 		description: calendarEvent.description,
@@ -270,6 +289,10 @@ const sendScheduledEvent = async (calendarEvent, status, db, guildId) => {
 
 
 	if (status === 'added') {
+		if (calendarEvent.creator.email === 'public-service@acabotjs.iam.gserviceaccount.com') {
+			console.log('Event already created by bot in Discord, skipping Discord event creation.');
+			return;
+		}
 		console.log('Brand new event, sending to Discord.');
 		const response = await fetch(`https://discord.com/api/v10/guilds/${guildId}/scheduled-events`, requestPayload);
 		const resData = await response.json();
@@ -284,10 +307,10 @@ const sendScheduledEvent = async (calendarEvent, status, db, guildId) => {
 		
 		if (guild.exists) {
 			const data = guild.data();
-			data.events.push({ googleId: calendarEvent.id, discordId: resData.id, needsUpdate: true });
+			data.events.push({ googleId: calendarEvent.id, discordId: resData.id, calendarId, needsUpdate: true });
 			await db.collection('discordevents').doc(guildId).set(data);
 		} else {
-			await db.collection('discordevents').doc(guildId).set({ events: [{ googleId: calendarEvent.id, discordId: resData.id, needsUpdate: true }] });
+			await db.collection('discordevents').doc(guildId).set({ events: [{ googleId: calendarEvent.id, discordId: resData.id, calendarId, needsUpdate: true }] });
 		}
 		console.log('Scheduled event stored in Firestore.');
 	} else {
@@ -296,15 +319,18 @@ const sendScheduledEvent = async (calendarEvent, status, db, guildId) => {
 		const data = await guild.data();
 		console.log(`Firestore Data: ${JSON.stringify(data.events)}`);
 		const event = data.events.indexOf(data.events.find((item) => item.googleId === calendarEvent.id));
+		let discordId = '';
 		if (event === -1) {
 			if(status === 'deleted') {
 				console.log('Deleted event not found in Firestore, skipping.');
 				return;
 			} else {
+				discordId = data.events[event].discordId
 				console.log('Event not found in Firestore, adding to Firestore.');
-				const response = await fetch(`https://discord.com/api/v10/guilds/${guildId}/scheduled-events/${data.events[event].discordId}`, requestPayload);
+				requestPayload.method = 'POST';
+				const response = await fetch(`https://discord.com/api/v10/guilds/${guildId}/scheduled-events/`, requestPayload);
 				const resData = await response.json();		
-				data.events.push({ googleId: calendarEvent.id, discordId: resData.id, needsUpdate: true });
+				data.events.push({ googleId: calendarEvent.id, discordId: resData.id, calendarId, needsUpdate: true });
 				await db.collection('discordevents').doc(guildId).set(data);
 				console.log('Event added to Firestore.');
 				return;
@@ -318,12 +344,13 @@ const sendScheduledEvent = async (calendarEvent, status, db, guildId) => {
 				return
 			}
 			data.events[event].needsUpdate = false;
+			discordId = data.events[event].discordId
 			if (status === 'deleted') {
 				data.events.splice(event, 1);
 			}
 		}
 		await db.collection('discordevents').doc(guildId).set(data);
-		const response = await fetch(`https://discord.com/api/v10/guilds/${guildId}/scheduled-events/${data.events[event].discordId}`, requestPayload);
+		const response = await fetch(`https://discord.com/api/v10/guilds/${guildId}/scheduled-events/${discordId}`, requestPayload);
 		const resData = await response.json();
 		console.log(`Response: ${JSON.stringify(resData)}`);
 		if (!response.ok) {

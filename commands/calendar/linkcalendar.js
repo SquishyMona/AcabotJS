@@ -1,8 +1,10 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { BaseGuildTextChannel, SlashCommandBuilder, TextChannel } from 'discord.js';
 import { getCalendar } from '../../lib/gcal/getCalendar.js';
 import { aclInsert } from '../../lib/gcal/aclInsert.js';
 import { promises as fs } from 'fs';
 import { newWatch } from '../../lib/gcal/newWatch.js';
+import Firestore from '@google-cloud/firestore';
+import { botUserID } from '../../index.js';
 
 export const data = new SlashCommandBuilder()
 	.setName('linkcalendar')
@@ -14,15 +16,25 @@ export const data = new SlashCommandBuilder()
 	.addChannelOption(option =>
 		option.setName('channel')
 			.setDescription('The channel to send calendar events to')
-			.setRequired(true));
+			.setRequired(true))
+	.addBooleanOption(option =>
+		option.setName('setasdefault')
+			.setDescription('If true, this calendar will be set as the default calendar for this server.')
+			.setRequired(false));
 
 export const execute = async (interaction) => {
+	const botId = await botUserID;
 	await interaction.deferReply();
+	const db = new Firestore.Firestore({ projectId: 'acabotjs', keyFilename: `${process.cwd()}/cloud/serviceaccount.json` });
+	const guild = await db.collection('links').doc(interaction.guild.id).get();
+	if(guild.exists) {
+		const calendars = guild.data().calendars;
+		if(calendars.find(calendar => calendar.calendarId === interaction.options.getString('calendar_id'))) {
+			return await interaction.followUp('This calendar has already been linked to this server.');
+		}
+	}
+	
 	const calendarId = interaction.options.getString('calendar_id');
-	const linkFile = await fs.readFile(`${process.cwd()}/lib/gcal/links.json`, 'utf8');
-	const links = await JSON.parse(linkFile);
-	if (links.some(link => link.serverId === interaction.guild.id && link.calendars.some(cal => cal.calendarId === calendarId))) return await interaction.followUp('This server is already linked to this calendar.');
-
 	const calendar = await getCalendar(interaction.member.id, calendarId).catch(async (error) => {
 		console.error(error);
 		return null;
@@ -37,17 +49,32 @@ export const execute = async (interaction) => {
 	if (!acl) return await interaction.followUp('There was an error sharing your calendar with the bot.');
 
 	const textChannel = interaction.options.getChannel('channel');
-	const webhook = await textChannel.createWebhook({ name: 'Acabot', avatar: interaction.client.user.avatarURL() });
-	console.log(`New webhook created in #${textChannel.name}: ${webhook}`);
+	const existingWebhooks = await textChannel.fetchWebhooks();
+	const item = existingWebhooks.find(webhook => webhook.owner.id === botId);
+
+	console.log(item);
+	let webhook = '';
+	if (item === undefined) {
+		webhook = await textChannel.createWebhook({ name: 'Acabot', avatar: interaction.client.user.avatarURL() });
+	} else {
+		webhook = item;
+
+	}
+	console.log(`New webhook in #${textChannel.name}: ${webhook}`);
 	const watch = await newWatch(interaction.member.id, calendar.id, interaction.guild.id, webhook.url).catch(async (error) => {
 		console.error(error);
 		return null;
 	});
 	if (!watch) return await interaction.followUp('There was an error setting up the watch on your calendar.');
 
-	const index = links.findIndex(link => link.serverId === interaction.guild.id);
-	if (index === -1) links.push({ serverId: interaction.guild.id, calendars: [{ calendarId: calendar.id, watch: watch }] });
-	else links[index].calendars.push({ calendarId: calendar.id, watch: watch });
-	await fs.writeFile(`${process.cwd()}/lib/gcal/links.json`, JSON.stringify(links, null, '\t'));
+	if (!guild.exists) db.collection('links').doc(interaction.guild.id).set({ defaultCalendar: calendar.id, calendars: [{ calendarId: calendar.id, watch: watch }] });
+	else {
+		const setAsDefault = interaction.options.getBoolean('setasdefault');
+		const guildData = guild.data();
+		const calendars = guildData.calendars;
+		calendars.push({ calendarId: calendar.id, watch: watch });
+		if (setAsDefault) await db.collection('links').doc(interaction.guild.id).update({ defaultCalendar: calendar.id, calendars: calendars });
+		else await db.collection('links').doc(interaction.guild.id).update({ calendars });
+	}
 	await interaction.followUp(`${calendar.summary} has been linked to this server!`);
 };
