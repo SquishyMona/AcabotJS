@@ -19,4 +19,5 @@ export const execute = async (interaction) => {
 	const channelId = interaction.options.getString('channel_id');
 	const resourceId = interaction.options.getString('resource_id');
 	await stopChannels(interaction.user.id, channelId, resourceId);
+	await interaction.reply(`Stopped watching channel ${channelId}`);
 }
