@@ -17,6 +17,11 @@ export const execute = async (newScheduledEvent) => {
 	const db = new Firestore.Firestore({ projectId: 'acabotjs', keyFilename: `${process.cwd()}/cloud/serviceaccount.json` })
 	const firestoreGuild = await db.collection('discordevents').doc(newScheduledEvent.guildId).get();
 	const firestoreLink = await db.collection('links').doc(newScheduledEvent.guildId).get();
+
+	if(firestoreLink.data().calendars.length === 0) {
+		console.error('No calendars linked to this server');
+		return;
+	}
 	const calendarId = await firestoreLink.data().defaultCalendar;
 
 	const newEvent = {
@@ -41,6 +46,11 @@ export const execute = async (newScheduledEvent) => {
 		newEvent.start.dateTime = newScheduledEvent.scheduledStartAt.toISOString();
 		newEvent.end.dateTime = newScheduledEvent.scheduledEndAt.toISOString();
 	}
+
+	if (newScheduledEvent.recurrenceRule) {
+		console.log(`Recurrence: ${JSON.stringify(newScheduledEvent.recurrenceRule)}`);
+        newEvent.recurrence = newScheduledEvent.recurrenceRule;
+    }
 
 	const response = await eventInsert(newEvent, calendarId);
 	console.log(response);
