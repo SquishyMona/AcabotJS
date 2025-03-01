@@ -1,6 +1,5 @@
 import { Events } from 'discord.js';
 import Firestore from '@google-cloud/firestore';
-import { promises as fs } from 'fs';
 import { eventInsert } from '../lib/gcal/eventInsert.js';
 import { eventUpdate } from '../lib/gcal/eventUpdate.js';
 
@@ -41,10 +40,12 @@ export const execute = async (oldScheduledEvent, newScheduledEvent) => {
 		if (eventIndex === -1) {
 			console.log('Event not found in Firestore, creating new entry.');
 
-			const linkFile = await fs.readFile(`${process.cwd()}/lib/gcal/links.json`, 'utf8');
-			const links = await JSON.parse(linkFile);
-			const guild = links.find(link => link.serverId === newScheduledEvent.guildId)
-			const calendarId = guild.defaultCalendar;
+			const firestoreLinks = await db.collection('links').doc(newScheduledEvent.guildId).get();
+			if (!firestoreLinks.exists) {
+				console.error('Guild not found in Firestore');
+				return;
+			}
+			const calendarId = firestoreLinks.data().defaultCalendar;
 
 			const response = await eventInsert(newEvent, calendarId);
 			events.push({ googleId: response.data.id, discordId: newScheduledEvent.id, calendarId, needsUpdate: true });

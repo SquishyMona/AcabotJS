@@ -16,7 +16,7 @@ functions.http('webhooks', async (req, res) => {
 		console.log(`Task recieved from watch channel ${channel}: ${task}`);
 
 		if (task === 'incremental-sync') {
-			await incrementalSync(db);
+			await incrementalSync(db, calendar);
 			res.send('Sucessfully synced calendars');
 			return;
 		}
@@ -106,6 +106,7 @@ functions.http('webhooks', async (req, res) => {
 					break;
 				}
 			};
+			console.log(`Webhook URL: ${eventWebhookUrl}`);
 			const results = await calendar.events.list({
 				calendarId,
 				syncToken,
@@ -199,7 +200,7 @@ const sendWebhook = async (url, results, calendarId, calendar, db, guildId) => {
 				changeType = 'added';
 			}
 		} else {
-			event.content = `**An event on the ${calendarName} calendar has been deleted!**`;
+			event.content = `**An event on the "${calendarName}" calendar has been deleted!**`;
 			event.embeds[0].color = 15158332;
 			changeType = 'deleted';
 		}
@@ -228,7 +229,7 @@ const saveNextSyncToken = async (guildId, calendarId, syncToken, doc, db) => {
 	console.log('Next sync token saved');
 };
 
-const incrementalSync = async (db) => {
+const incrementalSync = async (db, calendar) => {
 	console.log('Getting collection from Firestore.');
 	const collectionRef = db.collection('synctokens');
 	console.log('Getting all documents from collection.');
@@ -325,11 +326,16 @@ const sendScheduledEvent = async (calendarEvent, calendarId, status, db, guildId
 				console.log('Deleted event not found in Firestore, skipping.');
 				return;
 			} else {
-				discordId = data.events[event].discordId
 				console.log('Event not found in Firestore, adding to Firestore.');
 				requestPayload.method = 'POST';
-				const response = await fetch(`https://discord.com/api/v10/guilds/${guildId}/scheduled-events/`, requestPayload);
-				const resData = await response.json();		
+				const response = await fetch(`https://discord.com/api/v10/guilds/${guildId}/scheduled-events`, requestPayload);
+				const resData = await response.json();	
+				console.log(`Response: ${JSON.stringify(resData)}`);
+				if (!response.ok) {
+					console.error(`Error creating scheduled event: ${JSON.stringify(resData)}`);
+					return;
+				}
+				console.log('Scheduled event created.');	
 				data.events.push({ googleId: calendarEvent.id, discordId: resData.id, calendarId, needsUpdate: true });
 				await db.collection('discordevents').doc(guildId).set(data);
 				console.log('Event added to Firestore.');

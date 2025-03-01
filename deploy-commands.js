@@ -40,12 +40,10 @@ const rest = new REST().setToken(process.env.BOT_TOKEN);
 			{ body: commands },
 		);
 
-		/* Global Command Registration
-        await rest.put(
-            Routes.applicationCommands(process.env.CLIENT_ID),
+        const global = await rest.put(
+            Routes.applicationCommands(process.env.DISCORD_APP_ID),
             { body: commands },
         );
-        */
 
 		console.log(`Successfully reloaded ${data.length} application (/) commands.`);
 	} catch (error) {

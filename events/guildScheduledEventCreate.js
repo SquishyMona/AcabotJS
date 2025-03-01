@@ -1,19 +1,23 @@
 import { Events } from 'discord.js';
 import { botUserID } from '../index.js';
 import Firestore from '@google-cloud/firestore';
-import { promises as fs } from 'fs';
 import { eventInsert } from '../lib/gcal/eventInsert.js';
 
 export const name = Events.GuildScheduledEventCreate;
 
 export const execute = async (newScheduledEvent) => {
 	const botId = await botUserID;
-	if (newScheduledEvent.creatorId === await botId) {
+	if (newScheduledEvent.creatorId === botId) {
 		console.log('Event created in Google Calendar, skipping GCal event creation');
 		return;
 	}
 
 	console.log('Event created in Discord, creating Google Calendar event');
+
+	const db = new Firestore.Firestore({ projectId: 'acabotjs', keyFilename: `${process.cwd()}/cloud/serviceaccount.json` })
+	const firestoreGuild = await db.collection('discordevents').doc(newScheduledEvent.guildId).get();
+	const firestoreLink = await db.collection('links').doc(newScheduledEvent.guildId).get();
+	const calendarId = await firestoreLink.data().defaultCalendar;
 
 	const newEvent = {
 		'summary': newScheduledEvent.name,
@@ -38,16 +42,9 @@ export const execute = async (newScheduledEvent) => {
 		newEvent.end.dateTime = newScheduledEvent.scheduledEndAt.toISOString();
 	}
 
-	const linkFile = await fs.readFile(`${process.cwd()}/lib/gcal/links.json`, 'utf8');
-	const links = await JSON.parse(linkFile);
-	const guild = links.find(link => link.serverId === newScheduledEvent.guildId)
-	const calendarId = guild.defaultCalendar;
-
 	const response = await eventInsert(newEvent, calendarId);
 	console.log(response);
 
-	const db = new Firestore.Firestore({ projectId: 'acabotjs', keyFilename: `${process.cwd()}/cloud/serviceaccount.json` })
-	const firestoreGuild = await db.collection('discordevents').doc(newScheduledEvent.guildId).get();
 	if (!firestoreGuild.exists) {
 		await db.collection('discordevents').doc(newScheduledEvent.guild_id).set({
 			events: [{ googleId: response.data.id, discordId: newScheduledEvent.id, calendarId, needsUpdate: true}]
