@@ -7,6 +7,7 @@ dotenv.config();
 const __dirname = path.resolve();
 
 const commands = [];
+const devcommands = []
 // Grab all the command folders from the commands directory you created earlier
 const foldersPath = path.join(__dirname, 'commands');
 const commandFolders = fs.readdirSync(foldersPath);
@@ -20,7 +21,10 @@ for (const folder of commandFolders) {
 		const filePath = path.join(commandsPath, file);
 		const command = await import(`file://${filePath}`);;
 		if ('data' in command && 'execute' in command) {
-			commands.push(command.data.toJSON());
+			devcommands.push(command.data.toJSON());
+			if (folder !== 'admin') {
+				commands.push(command.data.toJSON());
+			}
 		} else {
 			console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
 		}
@@ -38,7 +42,7 @@ export const deployCommands = async () => {
 		// The put method is used to fully refresh all commands in the guild with the current set
 		const data = await rest.put(
 			Routes.applicationGuildCommands(process.env.DISCORD_APP_ID, process.env.GUILD_ID),
-			{ body: commands },
+			{ body: devcommands },
 		);
 
         const global = await rest.put(
