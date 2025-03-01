@@ -2,6 +2,7 @@ import { SlashCommandBuilder } from 'discord.js';
 import { google } from 'googleapis';
 import Firestore from '@google-cloud/firestore';
 import { watchStop } from '../../lib/gcal/watchStop.js';
+import { linkedCalendarAutocomplete } from '../../lib/autocomplete/linkedCalendarsAutocomplete.js';
 
 export const data = new SlashCommandBuilder()
 	.setName('unlinkcalendar')
@@ -17,13 +18,7 @@ export const data = new SlashCommandBuilder()
 			.setRequired(true));
 
 export const autocomplete = async (interaction) => {
-	const db = new Firestore.Firestore({ projectId: 'acabotjs', keyFilename: `${process.cwd()}/cloud/serviceaccount.json` });
-	const guild = await db.collection('links').doc(interaction.guild.id).get();
-	if(!guild.exists) {
-		return await interaction.respond('No calendars have been linked to this server.');
-	}
-	const calendars = guild.data().calendars;
-	await interaction.respond(calendars.map(calendar => ({ name: calendar.calendarName, value: calendar.calendarId })));
+	await linkedCalendarAutocomplete(interaction);
 };
 
 export const execute = async (interaction) => {

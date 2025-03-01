@@ -20,8 +20,12 @@ export const execute = async (client) => {
 		}
 	});
 
-	auth.useFirestoreDataHandlers(db, 'auth');
-	
+	if (process.env.ENVIRONMENT === 'development') {
+		auth.useDefaultDataHandlers(`${process.cwd()}/authconnect.json`);
+	} else {
+		auth.useFirestoreDataHandlers(db, 'auth');
+	}
+
 	setInterval(incrementalSync, 1000 * 60 * 5);
 	setInterval(async () => await getUpcoming(client), 1000 * 60);
 };
