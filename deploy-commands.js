@@ -21,6 +21,7 @@ for (const folder of commandFolders) {
 		const filePath = path.join(commandsPath, file);
 		const command = await import(`file://${filePath}`);;
 		if ('data' in command && 'execute' in command) {
+			console.log(`Folder: ${folder} - Command: ${command.data.name}`);
 			devcommands.push(command.data.toJSON());
 			if (folder !== 'admin') {
 				commands.push(command.data.toJSON());
