@@ -6,6 +6,9 @@ import { eventUpdate } from '../lib/gcal/eventUpdate.js';
 export const name = Events.GuildScheduledEventUpdate;
 
 export const execute = async (oldScheduledEvent, newScheduledEvent) => {
+	const RecurrenceFrequency = ['YEARLY', 'MONTHLY', 'WEEKLY', 'DAILY'];
+	const RecurrenceWeekday = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
+
 	const newEvent = {
 		'summary': newScheduledEvent.name,
 		'description': newScheduledEvent.description,
@@ -27,6 +30,19 @@ export const execute = async (oldScheduledEvent, newScheduledEvent) => {
 	} else {
 		newEvent.start.dateTime = newScheduledEvent.scheduledStartAt.toISOString();
 		newEvent.end.dateTime = newScheduledEvent.scheduledEndAt.toISOString();
+	}
+
+	if (newScheduledEvent.recurrenceRule) {
+		console.log(`Recurrence: ${JSON.stringify(newScheduledEvent.recurrenceRule)}`);
+		newEvent.recurrence = ['RRULE:']
+		newEvent.recurrence[0] += newScheduledEvent.recurrenceRule.frequency !== null ? `FREQ=${RecurrenceFrequency[newScheduledEvent.recurrenceRule.frequency]};` : '';
+		newEvent.recurrence[0] += newScheduledEvent.recurrenceRule.interval ? `INTERVAL=${newScheduledEvent.recurrenceRule.interval};` : '';
+		newEvent.recurrence[0] += newScheduledEvent.recurrenceRule.count ? `COUNT=${newScheduledEvent.recurrenceRule.count};` : '';
+		newEvent.recurrence[0] += newScheduledEvent.recurrenceRule.byWeekday ? `BYDAY=${newScheduledEvent.recurrenceRule.byWeekday.map(day => RecurrenceWeekday[day]).join(',')};` : '';
+		newEvent.recurrence[0] += newScheduledEvent.recurrenceRule.byNWeekday ? `BYDAY=${newScheduledEvent.recurrenceRule.byNWeekday.map(nweekday => nweekday.n + RecurrenceWeekday[nweekday.day])};` : '';
+		newEvent.recurrence[0] += newScheduledEvent.recurrenceRule.byMonth ? `BYMONTH=${newScheduledEvent.recurrenceRule.byMonth.map(month => month).join(',')};` : '';
+		newEvent.recurrence[0] += newScheduledEvent.recurrenceRule.byMonthDay ? `BYMONTHDAY=${newScheduledEvent.recurrenceRule.byMonthDay.join(',')};` : '';
+		console.log(`Recurrence: ${newEvent.recurrence[0]}`);
 	}
 
 	const db = new Firestore.Firestore({ projectId: 'acabotjs', keyFilename: `${process.cwd()}/cloud/serviceaccount.json` });
