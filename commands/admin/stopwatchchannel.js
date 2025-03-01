@@ -1,5 +1,5 @@
 import { SlashCommandBuilder } from "discord.js";
-import { stopChannels } from "../../lib/gcal/stopchannels";
+import { stopChannels } from "../../lib/gcal/stopchannels.js";
 
 export const data = new SlashCommandBuilder()
 	.setName("stopwatchchannel")
