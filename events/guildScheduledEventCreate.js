@@ -6,6 +6,8 @@ import { eventInsert } from '../lib/gcal/eventInsert.js';
 export const name = Events.GuildScheduledEventCreate;
 
 export const execute = async (newScheduledEvent) => {
+	const RecurrenceFrequency = ['YEARLY', 'MONTHLY', 'WEEKLY', 'DAILY'];
+	const RecurrenceWeekday = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
 	const botId = await botUserID;
 	if (newScheduledEvent.creatorId === botId) {
 		console.log('Event created in Google Calendar, skipping GCal event creation');
@@ -49,8 +51,16 @@ export const execute = async (newScheduledEvent) => {
 
 	if (newScheduledEvent.recurrenceRule) {
 		console.log(`Recurrence: ${JSON.stringify(newScheduledEvent.recurrenceRule)}`);
-        newEvent.recurrence = newScheduledEvent.recurrenceRule;
-    }
+		newEvent.recurrence = ['RRULE:']
+		newEvent.recurrence[0] += newScheduledEvent.recurrenceRule.frequency !== null ? `FREQ=${RecurrenceFrequency[newScheduledEvent.recurrenceRule.frequency]};` : '';
+		newEvent.recurrence[0] += newScheduledEvent.recurrenceRule.interval ? `INTERVAL=${newScheduledEvent.recurrenceRule.interval};` : '';
+		newEvent.recurrence[0] += newScheduledEvent.recurrenceRule.count ? `COUNT=${newScheduledEvent.recurrenceRule.count};` : '';
+		newEvent.recurrence[0] += newScheduledEvent.recurrenceRule.byWeekday ? `BYDAY=${newScheduledEvent.recurrenceRule.byWeekday.map(day => RecurrenceWeekday[day]).join(',')};` : '';
+		newEvent.recurrence[0] += newScheduledEvent.recurrenceRule.byNWeekday ? `BYDAY=${newScheduledEvent.recurrenceRule.byNWeekday.map(nweekday => nweekday.n + RecurrenceWeekday[nweekday.day])};` : '';
+		newEvent.recurrence[0] += newScheduledEvent.recurrenceRule.byMonth ? `BYMONTH=${newScheduledEvent.recurrenceRule.byMonth.map(month => month).join(',')};` : '';
+		newEvent.recurrence[0] += newScheduledEvent.recurrenceRule.byMonthDay ? `BYMONTHDAY=${newScheduledEvent.recurrenceRule.byMonthDay.join(',')};` : '';
+		console.log(`Recurrence: ${newEvent.recurrence[0]}`);
+	}
 
 	const response = await eventInsert(newEvent, calendarId);
 	console.log(response);

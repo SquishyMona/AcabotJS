@@ -277,7 +277,7 @@ const sendScheduledEvent = async (calendarEvent, calendarId, status, db, guildId
 	const start = new Date(calendarEvent.start.date ? calendarEvent.start.date : calendarEvent.start.dateTime.slice(0, -6) + 'Z').toISOString();
 	const end = new Date(calendarEvent.end.date ? calendarEvent.end.date : calendarEvent.end.dateTime.slice(0, -6) + 'Z').toISOString();
 	const entity_metadata = { location: calendarEvent.location ?? 'No Location Provided' };
-	requestPayload.body = JSON.stringify({
+	const requestBody = {
 		name: calendarEvent.summary,
 		entity_metadata: entity_metadata,
 		scheduled_start_time: start.replace('Z', '-05:00'),
@@ -285,7 +285,38 @@ const sendScheduledEvent = async (calendarEvent, calendarId, status, db, guildId
 		privacy_level: 2,
 		entity_type: 3,
 		description: calendarEvent.description,
-	});
+	};
+
+	if (calendarEvent.recurrence) {
+		requestBody.recurrence_rule = {start: requestBody.scheduled_start_time};
+		const recurrenceFrequency = ['YEARLY', 'MONTHLY', 'WEEKLY', 'DAILY'];
+		const recurrenceWeekday = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
+		const recurrenceRule = calendarEvent.recurrence[0].split(':')[1].split(';')
+		console.log(`Recurrence Rule: ${recurrenceRule}`);
+		for (const rule of recurrenceRule) {
+			console.log(`Rule: ${rule}`);
+			if (rule.includes('FREQ')) {
+				requestBody.recurrence_rule.frequency = recurrenceFrequency.indexOf(rule.split('=')[1]);
+			}
+			if (rule.includes('INTERVAL')) {
+				requestBody.recurrence_rule.interval = rule.split('=')[recurrenceWeekday.indexOf(rule.split('=')[1])];
+			}
+			if (rule.includes('BYDAY')) {
+				if (rule.includes(',')) {
+					requestBody.recurrence_rule.by_weekday = rule.split('=')[1].split(',');
+				} else {
+					requestBody.recurrence_rule.by_nweekday = [{ n: rule.split('=')[1].slice(0, -2), day: rule.split('=')[1].slice(-2) }];
+				}
+			}
+			if (rule.includes('BYMONTH')) {
+				requestBody.recurrence_rule.by_month = rule.split('=')[1].split(',');
+			}
+			if (rule.includes('BYMONTHDAY')) {
+				requestBody.recurrence_rule.by_monthday = rule.split('=')[1].split(',');
+			}
+		}
+	}
+	requestPayload.body = JSON.stringify(requestBody);
 	console.log(`Request Payload: ${JSON.stringify(requestPayload)}`);
 
 
