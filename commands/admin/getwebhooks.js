@@ -15,6 +15,7 @@ const execute = async (interaction) => {
 	const textChannel = interaction.options.getChannel('channel');
 	const webhooks = await textChannel.fetchWebhooks();
 	const existingWebhooks = webhooks.find(webhook => webhook.owner.id === botId);
+	console.log(existingWebhooks);
 	console.log(existingWebhooks.url);
 	const index = existingWebhooks.findIndex(webhook => webhook.owner.id === botId);
 	console.log(botId);

@@ -4,6 +4,7 @@ import { aclInsert } from '../../lib/gcal/aclInsert.js';
 import { newWatch } from '../../lib/gcal/newWatch.js';
 import Firestore from '@google-cloud/firestore';
 import { botUserID } from '../../index.js';
+import { googleCalendarsAutocomplete } from '../../lib/autocomplete/googleCalendarsAutocomplete.js';
 
 export const data = new SlashCommandBuilder()
 	.setName('linkcalendar')
@@ -11,7 +12,8 @@ export const data = new SlashCommandBuilder()
 	.addStringOption(option =>
 		option.setName('calendar_id')
 			.setDescription('The ID of the calendar you want to link')
-			.setRequired(true))
+			.setRequired(true)
+			.setAutocomplete(true))
 	.addChannelOption(option =>
 		option.setName('updates_channel')
 			.setDescription('The channel to send calendar event updates to. Defaults to the current channel.')
@@ -24,6 +26,11 @@ export const data = new SlashCommandBuilder()
 		option.setName('setasdefault')
 			.setDescription('If true, this calendar will be set as the default calendar for this server.')
 			.setRequired(false));
+
+export const autocomplete = async (interaction) => {
+	const list = await googleCalendarsAutocomplete(interaction.user.id);
+	await interaction.respond(list);
+}
 
 export const execute = async (interaction) => {
 	const botId = await botUserID;
