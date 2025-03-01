@@ -11,9 +11,10 @@
   "author": "Ian Cioppa",
   "license": "ISC",
   "dependencies": {
+    "@google-cloud/firestore": "^7.11.0",
     "@google-cloud/functions-framework": "^3.4.5",
     "@google-cloud/local-auth": "^2.1.0",
-    "@google-cloud/firestore": "^7.11.0",
+    "authconnect-djs": "^1.1.0",
     "discord.js": "^14.18.0",
     "dotenv": "^16.4.7",
     "googleapis": "^105.0.0",
