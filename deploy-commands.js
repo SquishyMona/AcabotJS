@@ -2,6 +2,7 @@ import { REST, Routes } from 'discord.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import dotenv from 'dotenv';
+
 dotenv.config();
 const __dirname = path.resolve();
 
@@ -30,7 +31,7 @@ for (const folder of commandFolders) {
 const rest = new REST().setToken(process.env.BOT_TOKEN);
 
 // and deploy your commands!
-(async () => {
+export const deployCommands = async () => {
 	try {
 		console.log(`Started refreshing ${commands.length} application (/) commands.`);
 
@@ -50,4 +51,4 @@ const rest = new REST().setToken(process.env.BOT_TOKEN);
 		// And of course, make sure you catch and log any errors!
 		console.error(error);
 	}
-})();
+};
