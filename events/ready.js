@@ -3,6 +3,7 @@ import { incrementalSync } from '../lib/gcal/incrementalSync.js';
 import { getUpcoming } from '../lib/gcal/getUpcoming.js';
 import AuthConnect from 'authconnect-djs';
 import Firestore from '@google-cloud/firestore';
+import { deployCommands } from '../deploy-commands.js';
 
 export const name = Events.ClientReady;
 export const once = true;
@@ -25,6 +26,8 @@ export const execute = async (client) => {
 	} else {
 		auth.useFirestoreDataHandlers(db, 'auth');
 	}
+
+	await deployCommands();
 
 	setInterval(incrementalSync, 1000 * 60 * 5);
 	setInterval(async () => await getUpcoming(client), 1000 * 60);
