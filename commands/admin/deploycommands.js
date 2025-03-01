@@ -1,5 +1,5 @@
 import { SlashCommandBuilder } from "discord.js";
-import { deployCommands } from "../../deploy-commands";
+import { deployCommands } from "../../deploy-commands.js";
 
 export const data = new SlashCommandBuilder()
 	.setName('deploycommands')
