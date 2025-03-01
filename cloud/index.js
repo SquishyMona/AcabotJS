@@ -13,7 +13,8 @@ functions.http('webhooks', async (req, res) => {
 
 		const task = req.get('X-Goog-Resource-State');
 		const channel = req.get('X-Goog-Channel-ID');
-		console.log(`Task recieved from watch channel ${channel}: ${task}`);
+		const resourceId = req.get('X-Goog-Resource-ID');
+		console.log(`Task recieved from watch channel \nID:${channel}\nResource ID:${resourceId}\nTask:${task}`);
 
 		if (task === 'incremental-sync') {
 			await incrementalSync(db, calendar);
