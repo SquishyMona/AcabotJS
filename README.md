@@ -13,4 +13,8 @@ This bot utilizes the Localist API to get calendar events from SUNY Fredonia's c
 ### More features coming soon.
 This bot is still in the process of being migrated from the old bot, so some functions may be missing. 
 
+
 **Notice:** AcabotJS utilizes Google API's for some of it's functions. Some functions may require the user to sign in with their Google Account. After signing in, the user's Google Account will be linked with the bot, and some information from that user's Google Account may be used by the bot. To learn more information, please read the [privacy policy](https://www.privacypolicies.com/live/f493ede2-c4ed-41ff-94f0-e4e59381305e)
+
+
+Feel free to contact me for support at ian.cioppa@gmail.com, and check out some of the other projects I've been working on here on GitHub!
