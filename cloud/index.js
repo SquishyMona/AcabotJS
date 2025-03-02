@@ -1,6 +1,10 @@
 import functions from '@google-cloud/functions-framework';
 import { google } from 'googleapis';
 import Firestore from '@google-cloud/firestore';
+import RRule from 'rrule';
+
+const RecurrenceFrequency = ['YEARLY', 'MONTHLY', 'WEEKLY', 'DAILY'];
+const RecurrenceWeekday = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
 
 functions.http('webhooks', async (req, res) => {
 	try {
@@ -275,8 +279,8 @@ const sendScheduledEvent = async (calendarEvent, calendarId, status, db, guildId
 		body: ''
 	};
 
-	const start = new Date(calendarEvent.start.date ? calendarEvent.start.date : calendarEvent.start.dateTime.slice(0, -6) + 'Z').toISOString();
-	const end = new Date(calendarEvent.end.date ? calendarEvent.end.date : calendarEvent.end.dateTime.slice(0, -6) + 'Z').toISOString();
+	const start = new Date(calendarEvent.start.date ? calendarEvent.start.date : calendarEvent.start.dateTime).toISOString();
+	const end = new Date(calendarEvent.end.date ? calendarEvent.end.date : calendarEvent.end.dateTime).toISOString();
 	const entity_metadata = { location: calendarEvent.location ?? 'No Location Provided' };
 	const requestBody = {
 		name: calendarEvent.summary,
@@ -288,35 +292,14 @@ const sendScheduledEvent = async (calendarEvent, calendarId, status, db, guildId
 		description: calendarEvent.description,
 	};
 
+	let newRecurrenceRule;
 	if (calendarEvent.recurrence) {
-		requestBody.recurrence_rule = {start: requestBody.scheduled_start_time};
-		const recurrenceFrequency = ['YEARLY', 'MONTHLY', 'WEEKLY', 'DAILY'];
-		const recurrenceWeekday = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
-		const recurrenceRule = calendarEvent.recurrence[0].split(':')[1].split(';')
-		console.log(`Recurrence Rule: ${recurrenceRule}`);
-		for (const rule of recurrenceRule) {
-			console.log(`Rule: ${rule}`);
-			if (rule.includes('FREQ')) {
-				requestBody.recurrence_rule.frequency = recurrenceFrequency.indexOf(rule.split('=')[1]);
-			}
-			if (rule.includes('INTERVAL')) {
-				requestBody.recurrence_rule.interval = rule.split('=')[recurrenceWeekday.indexOf(rule.split('=')[1])];
-			}
-			if (rule.includes('BYDAY')) {
-				if (rule.includes(',')) {
-					requestBody.recurrence_rule.by_weekday = rule.split('=')[1].split(',');
-				} else {
-					requestBody.recurrence_rule.by_nweekday = [{ n: rule.split('=')[1].slice(0, -2), day: rule.split('=')[1].slice(-2) }];
-				}
-			}
-			if (rule.includes('BYMONTH')) {
-				requestBody.recurrence_rule.by_month = rule.split('=')[1].split(',');
-			}
-			if (rule.includes('BYMONTHDAY')) {
-				requestBody.recurrence_rule.by_monthday = rule.split('=')[1].split(',');
-			}
-		}
+		newRecurrenceRule = parseRecurrenceRule(calendarEvent.recurrence[0].split(':')[1], start);
 	}
+
+	requestBody.recurrence_rule = newRecurrenceRule || undefined;
+	requestBody.scheduled_start_time = newRecurrenceRule ? new Date(newRecurrenceRule.startAt).toISOString() : start;
+	requestBody.scheduled_end_time = newRecurrenceRule ? new Date(new Date(newRecurrenceRule.startAt).getTime() + new Date(end).getTime() - new Date(start).getTime()).toISOString() : end;
 	requestPayload.body = JSON.stringify(requestBody);
 	console.log(`Request Payload: ${JSON.stringify(requestPayload)}`);
 
@@ -397,4 +380,50 @@ const sendScheduledEvent = async (calendarEvent, calendarId, status, db, guildId
 		}
 		console.log('Scheduled event updated.');
 	}
+};
+
+const getNextOccurrence = (recurrenceRule, startAt) => {
+    console.log(`Recurrence Rule: ${recurrenceRule}`);
+    const rule = new RRule.RRule.fromString(recurrenceRule);
+    return rule.after(new Date(new Date(startAt).toISOString().replace('Z', '-05:00')));
+}
+
+const parseRecurrenceRule = (recurrenceRule, googleStart) => {
+    let newRecurrenceRule = {};
+
+    if (new Date(googleStart).getTime() < new Date().getTime()) {
+        console.log(`Event has already occurred, finding next occurrence`);
+        const dtstart = googleStart.replaceAll('-', '').replaceAll('.', '').replaceAll(':', '').slice(0, -4);
+        const nextOccurrence = getNextOccurrence(`DTSTART:${dtstart};\n${recurrenceRule}`, new Date());
+        console.log(`Next Occurrence: ${nextOccurrence}`);
+        newRecurrenceRule.startAt = nextOccurrence;
+    } else {
+        newRecurrenceRule.startAt = new Date(googleStart);
+    }
+
+    console.log(`Recurrence Rule: ${recurrenceRule}`);
+    for (const rule of recurrenceRule.split(';')) {
+        console.log(`Rule: ${rule}`);
+        const [key, value] = rule.split('=');
+        switch (key) {
+            case 'FREQ':
+                newRecurrenceRule.frequency = RecurrenceFrequency.indexOf(value);
+                break;
+            case 'INTERVAL':
+                newRecurrenceRule.interval = parseInt(value, 10);
+                break;
+            case 'BYDAY':
+                newRecurrenceRule.by_weekday = value.includes(',') ? value.split(',') : [RecurrenceWeekday.indexOf(value.slice(-2))];
+                break;
+            case 'BYMONTH':
+                newRecurrenceRule.by_month = value.split(',');
+                break;
+            case 'BYMONTHDAY':
+                newRecurrenceRule.by_monthday = value.split(',');
+                break;
+        }
+    }
+	console.log
+
+    return newRecurrenceRule;
 };

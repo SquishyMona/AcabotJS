@@ -23,6 +23,7 @@ export const autocomplete = async (interaction) => {
 
 export const execute = async (interaction) => {
 	await interaction.deferReply();
+	const keepEvents = interaction.options.getBoolean('keepexistingevents');
 	const db = new Firestore.Firestore({ projectId: 'acabotjs', keyFilename: `${process.cwd()}/cloud/serviceaccount.json` });
 	const guild = await db.collection('links').doc(interaction.guild.id).get();
 	if(!guild.exists) {
@@ -55,21 +56,28 @@ export const execute = async (interaction) => {
 
 	const firestoreEvents = await db.collection('discordevents').doc(interaction.guild.id).get();
 	if(firestoreEvents.exists) {
-		const events = firestoreEvents.data().events;
-		const eventsToDelete = [];
-		const newFirestoreEvents = events;
-		for (const event of events) {
-			if(event.calendarId === calendarId) {
-				if(!interaction.options.getBoolean('keepexistingevents')) {
-					eventsToDelete.push(event.discordId);
+		const firestoreEvents = await db.collection('discordevents').doc(interaction.guild.id).get();
+		if (firestoreEvents.exists) {
+			const events = firestoreEvents.data().events;
+			const eventsToDelete = [];
+			const newFirestoreEvents = events.filter(event => {
+				if (event.calendarId === calendarId) {
+					if (!keepEvents) {
+						console.log(`Event ${event.discordId} should be deleted.`);
+						eventsToDelete.push(event.discordId);
+					}
+					return false; // Exclude this event from the new array
 				}
-				newFirestoreEvents.splice(newFirestoreEvents.indexOf(event));
-			}
-		}
-		await db.collection('discordevents').doc(interaction.guild.id).update({ events: newFirestoreEvents });
-		if (!interaction.options.getBoolean('keepexistingevents')) {
-			for(const event of eventsToDelete) {
-				await interaction.guild.scheduledEvents.delete(event).catch(console.error);
+				return true; // Include this event in the new array
+			});
+			
+			console.log(JSON.stringify(newFirestoreEvents));
+			console.log(JSON.stringify(eventsToDelete));
+			await db.collection('discordevents').doc(interaction.guild.id).update({ events: newFirestoreEvents });
+			if (!keepEvents) {
+				for (const event of eventsToDelete) {
+					await interaction.guild.scheduledEvents.delete(event).catch(console.error);
+				}
 			}
 		}
 	}

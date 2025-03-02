@@ -16,7 +16,8 @@
     "dependencies": {
         "@google-cloud/firestore": "^7.11.0",
         "@google-cloud/functions-framework": "^3.1.0",
-        "googleapis": "^105.0.0"
+        "googleapis": "^105.0.0",
+        "rrule": "^2.8.1"
     },
     "devDependencies": {
         "c8": "^10.0.0",
