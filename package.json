@@ -18,6 +18,7 @@
     "discord.js": "^14.18.0",
     "dotenv": "^16.4.7",
     "googleapis": "^105.0.0",
+    "rrule": "^2.8.1",
     "uuid": "^11.1.0"
   },
   "devDependencies": {

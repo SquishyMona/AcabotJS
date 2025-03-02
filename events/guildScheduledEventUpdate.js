@@ -6,6 +6,12 @@ import { eventUpdate } from '../lib/gcal/eventUpdate.js';
 export const name = Events.GuildScheduledEventUpdate;
 
 export const execute = async (oldScheduledEvent, newScheduledEvent) => {
+	const db = new Firestore.Firestore({ projectId: 'acabotjs', keyFilename: `${process.cwd()}/cloud/serviceaccount.json` });
+	const links = await db.collection('links').doc(newScheduledEvent.guildId).get();
+	if (!links.exists || links.data().calendars.length === 0) {
+		console.error('No calendars linked to this server');
+		return;
+	}
 	const RecurrenceFrequency = ['YEARLY', 'MONTHLY', 'WEEKLY', 'DAILY'];
 	const RecurrenceWeekday = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
 
@@ -45,7 +51,6 @@ export const execute = async (oldScheduledEvent, newScheduledEvent) => {
 		console.log(`Recurrence: ${newEvent.recurrence[0]}`);
 	}
 
-	const db = new Firestore.Firestore({ projectId: 'acabotjs', keyFilename: `${process.cwd()}/cloud/serviceaccount.json` });
 	const firestoreGuild = await db.collection('discordevents').doc(newScheduledEvent.guildId).get();
 	if (!firestoreGuild.exists) {
 		console.error('Guild not found in Firestore');
