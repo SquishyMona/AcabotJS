@@ -63,7 +63,7 @@ export const execute = async (interaction) => {
 				if(!interaction.options.getBoolean('keepexistingevents')) {
 					eventsToDelete.push(event.discordId);
 				}
-				newFirestoreEvents.splice(newFirestoreEvents.indexOf(event), 1);
+				newFirestoreEvents.splice(newFirestoreEvents.indexOf(event));
 			}
 		}
 		await db.collection('discordevents').doc(interaction.guild.id).update({ events: newFirestoreEvents });
