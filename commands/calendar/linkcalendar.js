@@ -5,6 +5,7 @@ import { newWatch } from '../../lib/gcal/newWatch.js';
 import Firestore from '@google-cloud/firestore';
 import { botUserID } from '../../index.js';
 import { googleCalendarsAutocomplete } from '../../lib/autocomplete/googleCalendarsAutocomplete.js';
+import { syncAllEvents } from '../../lib/gcal/syncAllEvents.js';
 
 export const data = new SlashCommandBuilder()
 	.setName('linkcalendar')
@@ -37,6 +38,7 @@ export const execute = async (interaction) => {
 	await interaction.deferReply();
 	const db = new Firestore.Firestore({ projectId: 'acabotjs', keyFilename: `${process.cwd()}/cloud/serviceaccount.json` });
 	const guild = await db.collection('links').doc(interaction.guild.id).get();
+	const sendDiscordTopGCal = guild.data().calendars.length === 0;
 	if(guild.exists) {
 		const calendars = guild.data().calendars;
 		if(calendars.find(calendar => calendar.calendarId === interaction.options.getString('calendar_id'))) {
@@ -91,5 +93,6 @@ export const execute = async (interaction) => {
 		if (setAsDefault || firstCalendar) await db.collection('links').doc(interaction.guild.id).update({ defaultCalendar: calendar.id, calendars: calendars });
 		else await db.collection('links').doc(interaction.guild.id).update({ calendars });
 	}
-	await interaction.followUp(`${calendar.summary} has been linked to this server!`);
+	await interaction.followUp(`${calendar.summary} has been linked to this server! The bot will now syncronize all events between Google Calendar and this server's scheduled events.`);
+	await syncAllEvents(calendarId, await interaction.guild.scheduledEvents, sendDiscordTopGCal)
 };

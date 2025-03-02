@@ -57,18 +57,19 @@ export const execute = async (interaction) => {
 	if(firestoreEvents.exists) {
 		const events = firestoreEvents.data().events;
 		const eventsToDelete = [];
+		const newFirestoreEvents = events;
 		for (const event of events) {
 			if(event.calendarId === calendarId) {
 				if(!interaction.options.getBoolean('keepexistingevents')) {
 					eventsToDelete.push(event.discordId);
 				}
-				events.splice(events.indexOf(event), 1);
+				newFirestoreEvents.splice(newFirestoreEvents.indexOf(event), 1);
 			}
 		}
-		await db.collection('discordevents').doc(interaction.guild.id).update({ events });
+		await db.collection('discordevents').doc(interaction.guild.id).update({ events: newFirestoreEvents });
 		if (!interaction.options.getBoolean('keepexistingevents')) {
 			for(const event of eventsToDelete) {
-				await interaction.guild.scheduledEvents.delete(event);
+				await interaction.guild.scheduledEvents.delete(event).catch(console.error);
 			}
 		}
 	}
