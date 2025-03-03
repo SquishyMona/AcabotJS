@@ -384,21 +384,24 @@ const sendScheduledEvent = async (calendarEvent, calendarId, status, db, guildId
 
 const getNextOccurrence = (recurrenceRule, startAt) => {
     console.log(`Recurrence Rule: ${recurrenceRule}`);
-    const rule = new RRule.RRule.fromString(recurrenceRule);
-    return rule.after(new Date(new Date(startAt).toISOString()));
+    const rule = RRule.RRule.fromString(recurrenceRule);
+    return rule.after(startAt, true); // Use the inclusive flag to ensure correct calculation
 }
 
 const parseRecurrenceRule = (recurrenceRule, googleStart) => {
     let newRecurrenceRule = {};
 
-    if (new Date(googleStart).getTime() < new Date().getTime()) {
+    const startAt = new Date(googleStart);
+    const now = new Date();
+
+    if (startAt.getTime() < now.getTime()) {
         console.log(`Event has already occurred, finding next occurrence`);
-        const dtstart = googleStart.replaceAll('-', '').replaceAll('.', '').replaceAll(':', '').slice(0, -4);
-        const nextOccurrence = getNextOccurrence(`DTSTART:${dtstart};\n${recurrenceRule}`, new Date().toISOString());
+        const dtstart = startAt.toISOString().replace(/[-:.]/g, '').slice(0, -4) + 'Z';
+        const nextOccurrence = getNextOccurrence(`DTSTART:${dtstart}\n${recurrenceRule}`, now);
         console.log(`Next Occurrence: ${nextOccurrence}`);
         newRecurrenceRule.start = nextOccurrence;
     } else {
-        newRecurrenceRule.start = new Date(googleStart);
+        newRecurrenceRule.start = startAt;
     }
 
     console.log(`Recurrence Rule: ${recurrenceRule}`);
