@@ -279,14 +279,14 @@ const sendScheduledEvent = async (calendarEvent, calendarId, status, db, guildId
 		body: ''
 	};
 
-	const start = new Date(calendarEvent.start.date ? calendarEvent.start.date : calendarEvent.start.dateTime).toISOString();
-	const end = new Date(calendarEvent.end.date ? calendarEvent.end.date : calendarEvent.end.dateTime).toISOString();
+	const start = calendarEvent.start.date ? new Date(`${calendarEvent.start.date}T00:00:00-05:00`) : new Date(calendarEvent.start.dateTime).toISOString();
+	const end = calendarEvent.end.date ? new Date(`${calendarEvent.end.date}T00:00:00-05:00`) : new Date(calendarEvent.end.dateTime).toISOString();
 	const entity_metadata = { location: calendarEvent.location ?? 'No Location Provided' };
 	const requestBody = {
 		name: calendarEvent.summary,
 		entity_metadata: entity_metadata,
-		scheduled_start_time: start.replace('Z', '-05:00'),
-		scheduled_end_time: end.replace('Z', '-05:00'),
+		scheduled_start_time: start,
+		scheduled_end_time: end,
 		privacy_level: 2,
 		entity_type: 3,
 		description: calendarEvent.description,
@@ -298,8 +298,8 @@ const sendScheduledEvent = async (calendarEvent, calendarId, status, db, guildId
 	}
 
 	requestBody.recurrence_rule = newRecurrenceRule || undefined;
-	requestBody.scheduled_start_time = newRecurrenceRule ? new Date(newRecurrenceRule.startAt).toISOString() : start;
-	requestBody.scheduled_end_time = newRecurrenceRule ? new Date(new Date(newRecurrenceRule.startAt).getTime() + new Date(end).getTime() - new Date(start).getTime()).toISOString() : end;
+	requestBody.scheduled_start_time = newRecurrenceRule ? new Date(newRecurrenceRule.start).toISOString() : start;
+	requestBody.scheduled_end_time = newRecurrenceRule ? new Date(new Date(newRecurrenceRule.start).getTime() + new Date(end).getTime() - new Date(start).getTime()).toISOString() : end;
 	requestPayload.body = JSON.stringify(requestBody);
 	console.log(`Request Payload: ${JSON.stringify(requestPayload)}`);
 
@@ -385,7 +385,7 @@ const sendScheduledEvent = async (calendarEvent, calendarId, status, db, guildId
 const getNextOccurrence = (recurrenceRule, startAt) => {
     console.log(`Recurrence Rule: ${recurrenceRule}`);
     const rule = new RRule.RRule.fromString(recurrenceRule);
-    return rule.after(new Date(new Date(startAt).toISOString().replace('Z', '-05:00')));
+    return rule.after(new Date(new Date(startAt).toISOString()));
 }
 
 const parseRecurrenceRule = (recurrenceRule, googleStart) => {
@@ -394,11 +394,11 @@ const parseRecurrenceRule = (recurrenceRule, googleStart) => {
     if (new Date(googleStart).getTime() < new Date().getTime()) {
         console.log(`Event has already occurred, finding next occurrence`);
         const dtstart = googleStart.replaceAll('-', '').replaceAll('.', '').replaceAll(':', '').slice(0, -4);
-        const nextOccurrence = getNextOccurrence(`DTSTART:${dtstart};\n${recurrenceRule}`, new Date());
+        const nextOccurrence = getNextOccurrence(`DTSTART:${dtstart};\n${recurrenceRule}`, new Date().toISOString());
         console.log(`Next Occurrence: ${nextOccurrence}`);
-        newRecurrenceRule.startAt = nextOccurrence;
+        newRecurrenceRule.start = nextOccurrence;
     } else {
-        newRecurrenceRule.startAt = new Date(googleStart);
+        newRecurrenceRule.start = new Date(googleStart);
     }
 
     console.log(`Recurrence Rule: ${recurrenceRule}`);
@@ -423,7 +423,6 @@ const parseRecurrenceRule = (recurrenceRule, googleStart) => {
                 break;
         }
     }
-	console.log
 
     return newRecurrenceRule;
 };
