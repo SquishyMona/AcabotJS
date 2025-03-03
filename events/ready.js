@@ -21,11 +21,7 @@ export const execute = async (client) => {
 		}
 	});
 
-	if (process.env.ENVIRONMENT === 'development') {
-		auth.useDefaultDataHandlers(`${process.cwd()}/authconnect.json`);
-	} else {
-		auth.useFirestoreDataHandlers(db, 'auth');
-	}
+	auth.useDefaultDataHandlers(`${process.cwd()}/authconnect.json`);
 
 	await deployCommands();
 
