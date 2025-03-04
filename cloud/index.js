@@ -222,7 +222,7 @@ const sendWebhook = async (url, results, calendarId, calendar, db, guildId) => {
 			console.error(`Error sending webhook: ${response.statusText}`);
 		}
 		console.log('Webhook sent');
-		await sendScheduledEvent(item, calendarId, changeType, db, guildId);
+		await sendScheduledEvent(item, calendarId, changeType, db, guildId, calendar);
 	}
 };
 
@@ -268,7 +268,7 @@ const incrementalSync = async (db, calendar) => {
 	});
 };
 
-const sendScheduledEvent = async (calendarEvent, calendarId, status, db, guildId) => {
+const sendScheduledEvent = async (calendarEvent, calendarId, status, db, guildId, calendar) => {
 	console.log(`Calendar Event: ${JSON.stringify(calendarEvent)}`);
 	const requestPayload = {
 		method: status === 'added' ? 'POST' : status === 'updated' ? 'PATCH' : 'DELETE',
@@ -293,14 +293,42 @@ const sendScheduledEvent = async (calendarEvent, calendarId, status, db, guildId
 	};
 
 	let newRecurrenceRule;
-	if (calendarEvent.recurrence) {
-		newRecurrenceRule = parseRecurrenceRule(calendarEvent.recurrence[0].split(':')[1], start);
+	if (calendarEvent.recurrence && status !== 'deleted') {
+		newRecurrenceRule = await parseRecurrenceRule(calendarEvent.recurrence[0].split(':')[1], start, calendar, calendarId, calendarEvent.id);
 	}
-
-	requestBody.recurrence_rule = newRecurrenceRule || undefined;
-	requestBody.scheduled_start_time = newRecurrenceRule ? new Date(newRecurrenceRule.start).toISOString() : start;
-	requestBody.scheduled_end_time = newRecurrenceRule ? new Date(new Date(newRecurrenceRule.start).getTime() + new Date(end).getTime() - new Date(start).getTime()).toISOString() : end;
-	requestPayload.body = JSON.stringify(requestBody);
+	if (newRecurrenceRule !== false) {
+		requestBody.recurrence_rule = newRecurrenceRule || undefined;
+		requestBody.scheduled_start_time = newRecurrenceRule ? new Date(newRecurrenceRule.start).toISOString() : start;
+		requestBody.scheduled_end_time = newRecurrenceRule ? new Date(new Date(newRecurrenceRule.start).getTime() + new Date(end).getTime() - new Date(start).getTime()).toISOString() : end;
+		requestPayload.body = JSON.stringify(requestBody);
+	} else {
+		console.log('Recurring event has ended, checking if a Firestore entry exists.');
+		const guild = await db.collection('discordevents').doc(guildId).get();
+		if (guild.exists) {
+			const data = guild.data();
+			const event = data.events.indexOf(data.events.find((item) => item.googleId === calendarEvent.id));
+			if (event !== -1) {
+				console.log('Event found in Firestore, deleting entry and Discord event.');
+				const discordEventId = data.events[event].discordId;
+				requestPayload.method = 'DELETE';
+				const response = await fetch(`https://discord.com/api/v10/guilds/${guildId}/scheduled-events/${discordEventId}`, requestPayload);
+				const resData = await response.json();
+				console.log(`Response: ${JSON.stringify(resData)}`);
+				if (!response.ok) {
+					console.error(`Error deleting scheduled event: ${JSON.stringify(resData)}`);
+					return;
+				} else {
+					console.log('Scheduled event deleted')
+				}
+				data.events.splice(event, 1);
+				await db.collection('discordevents').doc(guildId).set(data);
+				console.log('Event deleted from Firestore.');
+			} else {
+				console.log('Event not found in Firestore, skipping Discord event deletion.');
+			}
+		}
+		return;
+	}
 	console.log(`Request Payload: ${JSON.stringify(requestPayload)}`);
 
 
@@ -382,22 +410,28 @@ const sendScheduledEvent = async (calendarEvent, calendarId, status, db, guildId
 	}
 };
 
-const getNextOccurrence = (recurrenceRule, startAt) => {
-    console.log(`Recurrence Rule: ${recurrenceRule}`);
-    const rule = RRule.RRule.fromString(recurrenceRule);
-    return rule.after(startAt, true); // Use the inclusive flag to ensure correct calculation
-}
 
-const parseRecurrenceRule = (recurrenceRule, googleStart) => {
+const parseRecurrenceRule = async (recurrenceRule, googleStart, calendar, calendarId, eventId) => {
     let newRecurrenceRule = {};
 
     const startAt = new Date(googleStart);
     const now = new Date();
 
     if (startAt.getTime() < now.getTime()) {
-        console.log(`Event has already occurred, finding next occurrence`);
-        const dtstart = startAt.toISOString().replace(/[-:.]/g, '').slice(0, -4) + 'Z';
-        const nextOccurrence = getNextOccurrence(`DTSTART:${dtstart}\n${recurrenceRule}`, now);
+        //console.log(`Event has already occurred, finding next occurrence`);
+        //const dtstart = startAt.toISOString().replace(/[-:.]/g, '').slice(0, -4) + 'Z';
+        //const nextOccurrence = getNextOccurrence(`DTSTART:${dtstart}\n${recurrenceRule}`, now);
+		const initialList = await calendar.events.instances({
+			calendarId,
+			eventId,
+			timeMin: new Date().toISOString(),
+		});
+		if (initialList.data.items.length === 0) {
+			console.log('No upcoming instances found');
+			return false;
+		}
+		const nextOccurrence = initialList.data.items[0].start.dateTime ? new Date(initialList.data.items[0].start.dateTime) : new Date(`${initialList.data.items[0].start.date}T00:00:00-05:00`);
+
         console.log(`Next Occurrence: ${nextOccurrence}`);
         newRecurrenceRule.start = nextOccurrence;
     } else {
