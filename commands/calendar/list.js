@@ -1,8 +1,10 @@
 import { EmbedBuilder, MessageFlags, SlashCommandBuilder } from 'discord.js';
 import { listEvents } from '../../lib/gcal/listEvents.js';
 import { listFredoniaEvents } from '../../lib/localist/listFredoniaEvents.js';
+import { linkedCalendarAutocomplete } from '../../lib/autocomplete/linkedCalendarsAutocomplete.js';
 
-const data = new SlashCommandBuilder()
+
+export const data = new SlashCommandBuilder()
 	.setName('list')
 	.setDescription('List all events in the calendar')
 	.addSubcommand(subcommand =>
@@ -54,11 +56,11 @@ const data = new SlashCommandBuilder()
 			)
 		);
 
-const autocomplete = async (interaction) => {
+export const autocomplete = async (interaction) => {
 	await linkedCalendarAutocomplete(interaction);
 }
 
-const execute = async (interaction) => {
+export const execute = async (interaction) => {
 	if (interaction.options.getBoolean('hideresponse')) await interaction.deferReply({ flags: MessageFlags.Ephemeral }); else await interaction.deferReply();
 
 	if (interaction.options.getSubcommand() === 'fredoniaevents') {
@@ -87,5 +89,3 @@ const execute = async (interaction) => {
 		await interaction.channel.send({ embeds: [embed] });
 	}
 };
-
-export { data, execute };
