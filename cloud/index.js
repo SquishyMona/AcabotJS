@@ -312,8 +312,6 @@ const sendScheduledEvent = async (calendarEvent, calendarId, status, db, guildId
 				const discordEventId = data.events[event].discordId;
 				requestPayload.method = 'DELETE';
 				const response = await fetch(`https://discord.com/api/v10/guilds/${guildId}/scheduled-events/${discordEventId}`, requestPayload);
-				const resData = await response.json();
-				console.log(`Response: ${JSON.stringify(resData)}`);
 				if (!response.ok) {
 					console.error(`Error deleting scheduled event: ${JSON.stringify(resData)}`);
 					return;
