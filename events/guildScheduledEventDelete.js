@@ -6,7 +6,7 @@ export const name = Events.GuildScheduledEventDelete;
 
 export const execute = async (oldScheduledEvent) => {
 	const db = new Firestore.Firestore({ projectId: 'acabotjs', keyFilename: `${process.cwd()}/cloud/serviceaccount.json` });
-	const links = await db.collection('links').doc(newScheduledEvent.guildId).get();
+	const links = await db.collection('links').doc(oldScheduledEvent.guildId).get();
 	if (!links.exists || links.data().calendars.length === 0) {
 		console.error('No calendars linked to this server');
 		return;
