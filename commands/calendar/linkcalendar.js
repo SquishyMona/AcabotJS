@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { Message, MessageFlags, SlashCommandBuilder } from 'discord.js';
 import { getCalendar } from '../../lib/gcal/getCalendar.js';
 import { aclInsert } from '../../lib/gcal/aclInsert.js';
 import { newWatch } from '../../lib/gcal/newWatch.js';
@@ -42,7 +42,7 @@ export const execute = async (interaction) => {
 	if(guild.exists) {
 		const calendars = guild.data().calendars;
 		if(calendars.find(calendar => calendar.calendarId === interaction.options.getString('calendar_id'))) {
-			return await interaction.followUp('This calendar has already been linked to this server.');
+			return await interaction.followUp({ content: 'This calendar has already been linked to this server.', flags: MessageFlags.Ephemeral});
 		}
 	}
 	
@@ -51,14 +51,14 @@ export const execute = async (interaction) => {
 		console.error(error);
 		return null;
 	});
-	if (!calendar) return await interaction.followUp('Calendar not found. You may not have access to this calendar.');
+	if (!calendar) return await interaction.followUp( { content: 'Calendar not found. You may not have access to this calendar.', flags: MessageFlags.Ephemeral });	
 
-	await interaction.followUp('Attempting to link your Google Calendar account...');
+	await interaction.followUp({ content: 'Attempting to link your Google Calendar account...', flags: MessageFlags.Ephemeral });
 	const acl = await aclInsert(interaction.member.id, calendar.id).catch(async (error) => {
 		console.error(error);
 		return null;
 	});
-	if (!acl) return await interaction.followUp('There was an error sharing your calendar with the bot.');
+	if (!acl) return await interaction.followUp({ content: 'There was an error sharing your calendar with the bot.', flags: MessageFlags.Ephemeral });
 
 	const textChannel = interaction.options.getChannel('channel') || interaction.channel;
 	console.log(textChannel);
@@ -78,7 +78,7 @@ export const execute = async (interaction) => {
 		console.error(error);
 		return null;
 	});
-	if (!watch) return await interaction.followUp('There was an error setting up the watch on your calendar.');
+	if (!watch) return await interaction.followUp({ content: 'There was an error setting up the watch on your calendar.', flags: MessageFlags.Ephemeral });
 
 	if (!guild.exists) db.collection('links').doc(interaction.guild.id).set({ 
 		defaultCalendar: calendar.id, 
@@ -93,6 +93,10 @@ export const execute = async (interaction) => {
 		if (setAsDefault || firstCalendar) await db.collection('links').doc(interaction.guild.id).update({ defaultCalendar: calendar.id, calendars: calendars });
 		else await db.collection('links').doc(interaction.guild.id).update({ calendars });
 	}
-	await interaction.followUp(`${calendar.summary} has been linked to this server! The bot will now syncronize all events between Google Calendar and this server's scheduled events.`);
-	await syncAllEvents(calendarId, await interaction.guild.scheduledEvents, sendDiscordTopGCal)
+	await interaction.followUp({ content: `${calendar.summary} has been linked to this server! The bot will now attempt to syncronize all events between Google Calendar and this server's scheduled events. We'll ping you when this is finished!`, });
+	await syncAllEvents(calendarId, await interaction.guild.scheduledEvents, sendDiscordTopGCal).catch(async (error) => {
+		console.error(error);
+		await interaction.followUp({ content: `<@${interaction.user.id}> There was an error syncing events between Google Calendar and this server. You can unlink the calendar and try again, or leave it as is. Events will be sent to Discord as they are modified on Google Calendar.`, flags: MessageFlags.Ephemeral });
+	});
+	await interaction.followUp({ content: `<@${interaction.user.id}> Syncronization complete!`, flags: MessageFlags.Ephemeral });
 };
