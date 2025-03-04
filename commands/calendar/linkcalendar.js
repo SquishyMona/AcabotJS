@@ -97,6 +97,7 @@ export const execute = async (interaction) => {
 	await syncAllEvents(calendarId, await interaction.guild.scheduledEvents, sendDiscordTopGCal).catch(async (error) => {
 		console.error(error);
 		await interaction.followUp({ content: `<@${interaction.user.id}> There was an error syncing events between Google Calendar and this server. You can unlink the calendar and try again, or leave it as is. Events will be sent to Discord as they are modified on Google Calendar.`, flags: MessageFlags.Ephemeral });
+		return;
 	});
 	await interaction.followUp({ content: `<@${interaction.user.id}> Syncronization complete!`, flags: MessageFlags.Ephemeral });
 };
