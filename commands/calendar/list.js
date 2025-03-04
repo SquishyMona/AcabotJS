@@ -77,6 +77,11 @@ export const execute = async (interaction) => {
 		});
 		console.log(results);
 
+		if (!results) {
+			await interaction.followUp('No events found.');
+			return;
+		}
+
 		const embed = new EmbedBuilder()
 			.setTitle('Events')
 			.setColor(0x00AE86)
