@@ -54,30 +54,28 @@ export const execute = async (interaction) => {
 		}
 	}
 
+
 	const firestoreEvents = await db.collection('discordevents').doc(interaction.guild.id).get();
-	if(firestoreEvents.exists) {
-		const firestoreEvents = await db.collection('discordevents').doc(interaction.guild.id).get();
-		if (firestoreEvents.exists) {
-			const events = firestoreEvents.data().events;
-			const eventsToDelete = [];
-			const newFirestoreEvents = events.filter(event => {
-				if (event.calendarId === calendarId) {
-					if (!keepEvents) {
-						console.log(`Event ${event.discordId} should be deleted.`);
-						eventsToDelete.push(event.discordId);
-					}
-					return false; // Exclude this event from the new array
+	if (firestoreEvents.exists) {
+		const events = firestoreEvents.data().events;
+		const eventsToDelete = [];
+		const newFirestoreEvents = events.filter(event => {
+			if (event.calendarId === calendarId) {
+				if (!keepEvents) {
+					console.log(`Event ${event.discordId} should be deleted.`);
+					eventsToDelete.push(event.discordId);
 				}
-				return true; // Include this event in the new array
-			});
-			
-			console.log(JSON.stringify(newFirestoreEvents));
-			console.log(JSON.stringify(eventsToDelete));
-			await db.collection('discordevents').doc(interaction.guild.id).update({ events: newFirestoreEvents });
-			if (!keepEvents) {
-				for (const event of eventsToDelete) {
-					await interaction.guild.scheduledEvents.delete(event).catch(console.error);
-				}
+				return false; // Exclude this event from the new array
+			}
+			return true; // Include this event in the new array
+		});
+		
+		console.log(JSON.stringify(newFirestoreEvents));
+		console.log(JSON.stringify(eventsToDelete));
+		await db.collection('discordevents').doc(interaction.guild.id).update({ events: newFirestoreEvents });
+		if (!keepEvents) {
+			for (const event of eventsToDelete) {
+				await interaction.guild.scheduledEvents.delete(event).catch(console.error);
 			}
 		}
 	}
