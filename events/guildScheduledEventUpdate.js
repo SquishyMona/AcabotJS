@@ -6,6 +6,10 @@ import { eventUpdate } from '../lib/gcal/eventUpdate.js';
 export const name = Events.GuildScheduledEventUpdate;
 
 export const execute = async (oldScheduledEvent, newScheduledEvent) => {
+	if (oldScheduledEvent.status !== newScheduledEvent.status) {
+		console.log('Scheduled event status has changed, no need to update Google Calendar');
+		return;
+	}
 	const db = new Firestore.Firestore({ projectId: 'acabotjs', keyFilename: `${process.cwd()}/cloud/serviceaccount.json` });
 	const links = await db.collection('links').doc(newScheduledEvent.guildId).get();
 	if (!links.exists || links.data().calendars.length === 0) {
