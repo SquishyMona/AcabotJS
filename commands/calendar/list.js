@@ -71,7 +71,7 @@ export const execute = async (interaction) => {
 		const startDate = interaction.options.getString('start');
 		const endDate = interaction.options.getString('end');
 		await interaction.followUp({ content: 'Fetching events...', flags: MessageFlags.Ephemeral});
-		const results = await listEvents(interaction.member.id, calendarId).catch(async (error) => {
+		const results = await listEvents(interaction.member.id, calendarId, startDate, endDate).catch(async (error) => {
 			console.error(error);
 			await interaction.followUp('There was an error fetching events. Make sure you\'ve linked your Google Account using /linkaccount, then try again.');
 		});
@@ -85,10 +85,12 @@ export const execute = async (interaction) => {
 		const embed = new EmbedBuilder()
 			.setTitle('Events')
 			.setColor(0x00AE86)
-			.setDescription('List of events in your calendar');
+			.setDescription(`List of events in your calendar`);
 
 		results.forEach((event) => {
-			embed.addFields([{ name: event.summary, value: `Start: ${event.start.dateTime}\nEnd: ${event.end.dateTime}` }]);
+			const timezoneOffset = (new Date().getTimezoneOffset() / 60) * (1000 * 60 * 60);
+			const date = event.start.dateTime ? new Date(event.start.dateTime).getTime() : new Date(new Date(event.start.date).getTime() + timezoneOffset);
+			embed.addFields([{ name: event.summary, value: `Date<t:${date}:D>\nStart: <t${new Date(event.start.dateTime).getTime()}\nEnd: ${new Date(event.end.dateTime.getTime())}` }]);
 		});
 		await interaction.followUp('Events fetched successfully!');
 		await interaction.channel.send({ embeds: [embed] });
