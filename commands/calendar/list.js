@@ -90,7 +90,7 @@ export const execute = async (interaction) => {
 		results.forEach((event) => {
 			const timezoneOffset = (new Date().getTimezoneOffset() / 60) * (1000 * 60 * 60);
 			const date = event.start.dateTime ? new Date(event.start.dateTime).getTime() : new Date(new Date(event.start.date).getTime() + timezoneOffset).getTime();
-			embed.addFields([{ name: event.summary, value: `Date<t:${date}:D>\nStart: <t:${new Date(event.start.dateTime).getTime()}:t>\n<t:End: ${new Date(event.end.dateTime.getTime())}:t>` }]);
+			embed.addFields([{ name: event.summary, value: `Date<t:${date}:D>\nStart: <t:${new Date(event.start.dateTime).getTime()}:t>\n<t:End: ${new Date(event.end.dateTime).getTime()}:t>` }]);
 		});
 		await interaction.followUp('Events fetched successfully!');
 		await interaction.channel.send({ embeds: [embed] });
