@@ -6,11 +6,32 @@ import { eventUpdate } from '../lib/gcal/eventUpdate.js';
 export const name = Events.GuildScheduledEventUpdate;
 
 export const execute = async (oldScheduledEvent, newScheduledEvent) => {
-	if (oldScheduledEvent.status !== newScheduledEvent.status) {
-		console.log('Scheduled event status has changed, no need to update Google Calendar');
-		return;
-	}
 	const db = new Firestore.Firestore({ projectId: 'acabotjs', keyFilename: `${process.cwd()}/cloud/serviceaccount.json` });
+	if (oldScheduledEvent.status !== newScheduledEvent.status) {
+		if (newScheduledEvent.status === 3 && newScheduledEvent.recurrenceRule === null) {
+			console.log('One time scheduled event has ended, removing Firestore entry.')
+			const guild = await db.collection('discordevents').doc(newScheduledEvent.guildId).get();
+			if (!guild.exists) {
+				console.error('Guild not found in Firestore');
+				return;
+			} else {
+				const events = guild.data().events;
+				const eventIndex = events.indexOf(events.find((item) => item.discordId === newScheduledEvent.id));
+				if (eventIndex === -1) {
+					console.error('Event not found in Firestore');
+					return;
+				} else {
+					events.splice(events[eventIndex]);
+					await db.collection('discordevents').doc(newScheduledEvent.guildId).update({ events });
+					console.log('Entry removed from Firestore.');
+					return;
+				}
+			}
+		} else {
+			console.log('Scheduled event status has changed, no need to update Google Calendar');
+			return;
+		}
+	}
 	const links = await db.collection('links').doc(newScheduledEvent.guildId).get();
 	if (!links.exists || links.data().calendars.length === 0) {
 		console.error('No calendars linked to this server');
