@@ -1,5 +1,5 @@
 import { ComponentType, EmbedBuilder, MessageFlags } from "discord.js";
-import { createSheetComponents } from "../../lib/attendence/createSheetComponents.ts";
+import { createSheetComponents } from "../../lib/attendence/createSheetComponents.js";
 import Firestore from "@google-cloud/firestore";
 
 export const data = new SlashCommandBuilder()
