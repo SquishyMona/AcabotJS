@@ -27,7 +27,20 @@ const data = new SlashCommandBuilder()
 			.addSubcommand(command =>
 				command
 					.setName('defaultcalendar')
-					.setDescription('Get help with the /defaultcalendar command.')));
+					.setDescription('Get help with the /defaultcalendar command.')))
+		.addSubcommandGroup(group =>
+			group
+				.setName('list')
+				.setDescription('Commands related to listing events')
+				.addSubcommand(command =>
+					command
+						.setName('events')
+						.setDescription('Get help with the /list events command.'))
+				.addSubcommand(command =>
+					command
+						.setName('fredoniaevents')
+						.setDescription('Get help with the /list fredoniaevents calendars command.'))
+		);
 
 const execute = async (interaction) => {
 	const selectedGroup = interaction.options.getSubcommandGroup();
@@ -60,10 +73,13 @@ To use this feature, you'll need to make sure you have the following:
 Before you start, there are a few things you'll need to know:
 - When linking a calendar, the bot will be added to your calendar with permissions to make changes to it. This is necessary for the bot to sync events between Discord and Google Calendar.
 - If you have multiple calendars linked, one will be set as the default calendar. 
+- When linking calendars, all events from that calendar will be synced to Discord. If you have a lot of events, this may take some time.
+- If you choose to set the calendar you are linking as the default calendar, all your Discord scheduled events will be synced to that calendar.
 - When you create a new scheduled event in Discord, it will be added to the default calendar in Google Calendar.
   - For more information on default calendars, use the \`/help calendar defaultcalendar\` command.
-- You can set a specific channel for each calendar. When you link a calendar, you can choose a channel where events from that calendar will be posted. If you don't set a channel, events will be posted to the default channel.
+- You can set a specific channel to send event updates and notifications to using the optional \`updates_channel\` and \`upcoming_channel\` command arguments. If there isn't a channel already set, or if you don't specify one in the command, the bot will use the channel you send the command to.
 - You can unlink a calendar at any time using the \`/unlinkcalendar\` command.
+	- If you want to keep events that were synced to Discord, use the \`keepexistingevents\` option. If you choose to delete them, they will be removed from the server.
 								`
 							},
 							{ name: 'Step 1: Link your Google Account', value: 'Use the `/linkaccount` command to link your Google Account to the bot.' },
@@ -146,6 +162,15 @@ Before you start, there are a few things you'll need to know:
 								value: `If you already have a default calendar set in your server, you can use the \`setasdefault\` option to set this calendar as the new default calendar for this server. If this is the first calendar you're adding, it will automatically be set as the default calendar.`
 							},
 							{
+								name: `\`updates_channel\` and \`upcoming_channel\` options`,
+								value: 
+								`
+You can set a specific channel to send event updates and notifications to using the optional \`updates_channel\` and \`upcoming_channel\` command arguments. If there isn't a channel already set, or if you don't specify one in the command, the bot will use the channel you send the command to.
+- **\`updates_channel\`:** This channel will receive notifications when events are added, changed, or removed from the linked calendar.
+- **\`upcoming_channel\`:** This channel will receive notifications when there are events starting soon in Discord.
+								`
+							},
+							{
 								name: `I'm having trouble linking my calendar!`,
 								value: `If you're having trouble with the command, make sure you have the correct calendar ID. You can find this under **Settings > Integrate Calendar** on the Google Calendar website.`
 							}
@@ -156,7 +181,45 @@ Before you start, there are a few things you'll need to know:
 					break;
 			}
 			break;
-	
+		case 'list':
+			switch (selectedCommand) {
+				case 'events':
+					const embed6 = new EmbedBuilder()
+						.setTitle('List events')
+						.setDescription(`The \`/list events\` command allows you to list all the events in a specific calendar. You can choose to list all events, or filter by dates.`)
+						.setColor('#4287f5')
+						.addFields(
+							{
+								name: 'Filtering by date',
+								value: 
+								`
+You can filter events by date using the \`start\` and \`end\` options. This will list all events that start between the two dates you specify. If you only want to list events that start on a specific date, you can just use the \`start\` option. If you leave both these blank, then the command will list events that are happening today.
+								`
+							}
+						)
+					await interaction.reply({ embeds: [embed6], flags: MessageFlags.Ephemeral });
+					return;
+
+				case 'fredoniaevents':
+					const embed7 = new EmbedBuilder()
+						.setTitle('List Fredonia events')
+						.setDescription(`The \`/list fredoniaevents\` command allows you to list all the events from events.fredonia.edu.`)
+						.setColor('#4287f5')
+						.addFields(
+							{
+								name: 'Filtering by type',
+								value: 
+								`
+You can filter events by type using the \`type\` option. This will list all events that match the type you specify. If you leave this blank, then the command will list all events.
+								`
+							}
+						)
+					await interaction.reply({ embeds: [embed7], flags: MessageFlags.Ephemeral });
+					return;
+				default:
+					break;
+			}
+			break;
 		default:
 			break;
 	}

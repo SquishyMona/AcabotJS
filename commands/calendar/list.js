@@ -64,7 +64,9 @@ export const execute = async (interaction) => {
 	if (interaction.options.getBoolean('hideresponse')) await interaction.deferReply({ flags: MessageFlags.Ephemeral }); else await interaction.deferReply();
 
 	if (interaction.options.getSubcommand() === 'fredoniaevents') {
-		await listFredoniaEvents(interaction, interaction.options.getString('filter'), interaction.options.getString('date'));
+		const embed = await listFredoniaEvents(interaction, interaction.options.getString('filter'), interaction.options.getString('date'));
+		await interaction.followUp('Events successfully fetched from the Fredonia calendar!');
+		await interaction.channel.send({ embeds: [embed] });
 		return;
 	} else {
 		const calendarId = interaction.options.getString('calendar');
@@ -92,7 +94,9 @@ export const execute = async (interaction) => {
 			const date = event.start.dateTime ? Math.round(new Date(event.start.dateTime).getTime() / 1000) : Math.round((new Date(new Date(event.start.date).getTime() + timezoneOffset).getTime()) / 1000);
 			embed.addFields([{ name: event.summary, value: `<t:${date}:D>\nStarts: <t:${Math.round(new Date(event.start.dateTime).getTime() / 1000)}:t>\nEnds: <t:${Math.round(new Date(event.end.dateTime).getTime() / 1000)}:t>` }]);
 		});
-		await interaction.followUp('Events fetched successfully!');
-		await interaction.channel.send({ embeds: [embed] });
+		await interaction.followUp({ content: 'Events fetched successfully!', flags: MessageFlags.Ephemeral });
+		const messageOptions = { embeds: embed }
+		interaction.options.getBoolean('hideresponse') ? messageOptions.flags = MessageFlags.Ephemeral : null;
+		await interaction.channel.send(messageOptions);
 	}
 };
