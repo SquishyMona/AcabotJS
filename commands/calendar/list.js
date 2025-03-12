@@ -64,8 +64,11 @@ export const execute = async (interaction) => {
 
 	if (interaction.options.getSubcommand() === 'fredoniaevents') {
 		const embed = await listFredoniaEvents(interaction, interaction.options.getString('filter'), interaction.options.getString('date'));
+		const messageOptions = { embeds: [embed] };
+		interaction.options.getBoolean('hideresponse') ? messageOptions.flags = MessageFlags.Ephemeral : null;
+		console.log(messageOptions);
 		await interaction.followUp('Events successfully fetched from the Fredonia calendar!');
-		await interaction.channel.send({ embeds: [embed] });
+		await interaction.channel.send(messageOptions);
 		return;
 	} else {
 		const calendarId = interaction.options.getString('calendar');
