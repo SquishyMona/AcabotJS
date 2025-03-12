@@ -96,6 +96,7 @@ export const execute = async (interaction) => {
 		await interaction.followUp({ content: 'Events fetched successfully!', flags: MessageFlags.Ephemeral });
 		const messageOptions = { embeds: embed }
 		interaction.options.getBoolean('hideresponse') ? messageOptions.flags = MessageFlags.Ephemeral : null;
+		console.log(messageOptions);
 		await interaction.channel.send(messageOptions);
 	}
 };
