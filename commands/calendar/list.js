@@ -3,7 +3,6 @@ import { listEvents } from '../../lib/gcal/listEvents.js';
 import { listFredoniaEvents } from '../../lib/localist/listFredoniaEvents.js';
 import { linkedCalendarAutocomplete } from '../../lib/autocomplete/linkedCalendarsAutocomplete.js';
 
-
 export const data = new SlashCommandBuilder()
 	.setName('list')
 	.setDescription('List all events in the calendar')
