@@ -4,6 +4,7 @@ import Firestore from "@google-cloud/firestore";
 
 export const data = new SlashCommandBuilder()
 	.setName("attendence")
+	.setDescription("Create and manage attendence sheets.")
 	.addSubcommand(subcommand => 
 		subcommand.setName("createsheet")
 			.setDescription("Create a new one-time attendence sheet.")
