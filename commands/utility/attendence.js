@@ -25,8 +25,8 @@ export const data = new SlashCommandBuilder()
 	);
 
 export const execute = async (interaction) => {
-	//await interaction.reply({ content: `This command isn't working just yet; stay tuned for more information!`, flags: MessageFlags.Ephemeral });
-	//return;
+	await interaction.reply({ content: `This command isn't working just yet; stay tuned for more information!`, flags: MessageFlags.Ephemeral });
+	return;
 	await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 	const sheetName = interaction.options.getString('sheet_name');
 	const sendTime = interaction.options.getString('send_time');
