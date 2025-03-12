@@ -68,7 +68,7 @@ export const execute = async (interaction) => {
 		interaction.options.getBoolean('hideresponse') ? messageOptions.flags = MessageFlags.Ephemeral : null;
 		console.log(messageOptions);
 		await interaction.followUp('Events successfully fetched from the Fredonia calendar!');
-		await interaction.channel.send(messageOptions);
+		await interaction.followUp(messageOptions);
 		return;
 	} else {
 		const calendarId = interaction.options.getString('calendar');
@@ -100,6 +100,6 @@ export const execute = async (interaction) => {
 		const messageOptions = { embeds: embed }
 		interaction.options.getBoolean('hideresponse') ? messageOptions.flags = MessageFlags.Ephemeral : null;
 		console.log(messageOptions);
-		await interaction.channel.send(messageOptions);
+		await interaction.followUp(messageOptions);
 	}
 };
