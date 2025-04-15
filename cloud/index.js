@@ -68,8 +68,7 @@ functions.http('webhooks', async (req, res) => {
 			if (!channels) {
 				console.log('Guild not found, creating new entry.');
 				channels = { guildId, webhookUrl, channels: [{ calendarId, resourceId, channelId, syncToken: newSyncToken }] };
-				syncTokens.push(channels);
-				
+				syncTokens.push(channels);			
 			} else {
 				console.log(`Guild found, checking if a watch entry exists for resourceId ${resourceId}.`);
 				const index = channels.channels.findIndex((item) => item.resourceId === resourceId);
