@@ -26,7 +26,10 @@ export const execute = async (client) => {
 
 	await deployCommands();
 
+	incrementalSync();
 	setInterval(incrementalSync, 1000 * 60 * 5);
 	setInterval(async () => await getUpcoming(client), 1000 * 60);
+
+	refreshWatches();
 	setInterval(async () => await refreshWatches(), 1000 * 60 * 60 * 24 * 7);
 };
